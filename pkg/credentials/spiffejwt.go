@@ -17,8 +17,9 @@ type JWTSVIDSource struct {
 
 func NewJWTSVIDSource(subject spiffeid.ID, workloadSocket string, audience string) *JWTSVIDSource {
 	return &JWTSVIDSource{
-		subject:  subject,
-		audience: audience,
+		subject:        subject,
+		audience:       audience,
+		workloadSocket: workloadSocket,
 	}
 }
 
