@@ -18,7 +18,7 @@ type JWTSource interface {
 func NewProvider(audience string, jwtSource JWTSource) (*Provider, error) {
 	cfg := Provider{
 		Expiry:      credentials.Expiry{},
-		stsClient:   nil,
+		stsClient:   nil, // TODO: Need to set up AWS STS client
 		audience:    audience,
 		RenewWindow: time.Minute, // Default to 1 minute pre-renew. This avoids in-flight requests expiring.
 		jwtSource:   jwtSource,
