@@ -12,7 +12,7 @@ import (
 type CredentialsCmd struct {
 	Audience       string `required:"" help:"SVID JWT Audience. Must match AWS configuration"`
 	SpiffeID       string `required:"" help:"The SPIFFE ID of this workload"`
-	WorkloadSocket string `optional:"" help:"Path to SPIFFE Workload Socket" type:"existingfile"`
+	WorkloadSocket string `optional:"" help:"Path to SPIFFE Workload Socket"`
 	RoleARN        string `required:"" help:"AWS Role ARN to assume"`
 	SessionName    string `optional:"" help:"AWS Session Name"`
 	STSEndpoint    string `optional:"" help:"AWS STS Endpoint variable"`
@@ -26,7 +26,7 @@ func (c *CredentialsCmd) Run() error {
 
 	src := credentials.NewJWTSVIDSource(spiffeID, c.WorkloadSocket, c.Audience)
 
-	provider, err := credentials.NewProvider(c.Audience, src)
+	provider, err := credentials.NewProvider(c.Audience, c.RoleARN, src)
 	if err != nil {
 		return err
 	}
@@ -36,7 +36,7 @@ func (c *CredentialsCmd) Run() error {
 		return err
 	}
 
-	_, err = fmt.Print(creds)
+	_, err = fmt.Print(string(creds))
 	return err
 }
 
