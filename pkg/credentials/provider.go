@@ -6,6 +6,7 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
 )
 
@@ -15,11 +16,14 @@ type JWTSource interface {
 	FetchToken(ctx context.Context) (string, error)
 }
 
-func NewProvider(audience string, jwtSource JWTSource) (*Provider, error) {
+func NewProvider(audience, roleARN string, jwtSource JWTSource) (*Provider, error) {
+	mySession := session.Must(session.NewSession())
+
 	cfg := Provider{
 		Expiry:      credentials.Expiry{},
-		stsClient:   nil, // TODO: Need to set up AWS STS client
+		stsClient:   sts.New(mySession),
 		audience:    audience,
+		RoleARN:     roleARN,
 		RenewWindow: time.Minute, // Default to 1 minute pre-renew. This avoids in-flight requests expiring.
 		jwtSource:   jwtSource,
 	}
@@ -73,10 +77,13 @@ func (sp *Provider) Retrieve() (credentials.Value, error) {
 
 func (sp *Provider) assumeRole(ctx context.Context, token string) (*sts.AssumeRoleWithWebIdentityOutput, error) {
 	assumeReq := sts.AssumeRoleWithWebIdentityInput{
-		Policy:           &sp.Policy,
 		RoleArn:          &sp.RoleARN,
 		RoleSessionName:  &sp.SessionName,
 		WebIdentityToken: &token,
+	}
+
+	if len(sp.Policy) > 0 {
+		assumeReq.Policy = &sp.Policy
 	}
 
 	if sp.SessionDuration != 0 {
@@ -84,7 +91,7 @@ func (sp *Provider) assumeRole(ctx context.Context, token string) (*sts.AssumeRo
 	}
 
 	if *assumeReq.RoleSessionName == "" {
-		assumeReq.RoleSessionName = aws.String("session name from provider.go")
+		assumeReq.RoleSessionName = aws.String("spiffe-aws-assume-role")
 	}
 
 	for _, arn := range sp.PolicyARNs {
