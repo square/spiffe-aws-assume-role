@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"google.golang.org/grpc"
+
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/jwtsvid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
@@ -32,7 +34,7 @@ func (jss *JWTSVIDSource) FetchToken(ctx context.Context) (string, error) {
 	var dialOpts []workloadapi.JWTSourceOption
 
 	if jss.workloadSocket != "" {
-		dialOpts = append(dialOpts, workloadapi.WithClientOptions(workloadapi.WithAddr(jss.workloadSocket)))
+		dialOpts = append(dialOpts, workloadapi.WithClientOptions(workloadapi.WithAddr(jss.workloadSocket), workloadapi.WithDialOptions(grpc.WithNoProxy())))
 	}
 
 	ctx, cancel := context.WithTimeout(ctx, workloadConnTimeout)
@@ -40,7 +42,7 @@ func (jss *JWTSVIDSource) FetchToken(ctx context.Context) (string, error) {
 
 	jwtSource, err := workloadapi.NewJWTSource(ctx, dialOpts...)
 	if err != nil {
-		return "", fmt.Errorf("retrieving JWT-SVID: %w", err)
+		return "", fmt.Errorf("creating JWT-SVID source: %w", err)
 	}
 
 	jwt, err := jwtSource.FetchJWTSVID(ctx, jwtsvid.Params{
