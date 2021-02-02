@@ -2,31 +2,44 @@ package cli
 
 import (
 	"fmt"
+	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/square/spiffe-aws-assume-role/pkg/credentials"
 	"github.com/square/spiffe-aws-assume-role/pkg/processcreds"
+	"github.com/square/spiffe-aws-assume-role/pkg/util"
 )
 
 type CredentialsCmd struct {
-	Audience       string `required:"" help:"SVID JWT Audience. Must match AWS configuration"`
-	SpiffeID       string `required:"" help:"The SPIFFE ID of this workload"`
-	WorkloadSocket string `optional:"" help:"Path to SPIFFE Workload Socket"`
-	RoleARN        string `required:"" help:"AWS Role ARN to assume"`
-	SessionName    string `optional:"" help:"AWS Session Name"`
-	STSEndpoint    string `optional:"" help:"AWS STS Endpoint variable"`
+	Audience        string        `required help:"SVID JWT Audience. Must match AWS configuration"`
+	SpiffeID        string        `required help:"The SPIFFE ID of this workload"`
+	WorkloadSocket  string        `optional help:"Path to SPIFFE Workload Socket"`
+	RoleARN         string        `required help:"AWS Role ARN to assume"`
+	SessionName     string        `optional help:"AWS Session Name"`
+	STSEndpoint     string        `optional help:"AWS STS Endpoint variable"`
+	SessionDuration time.Duration `optional type:iso8601duration help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
 }
 
-func (c *CredentialsCmd) Run() error {
+type CliContext struct {
+	JWTSourceProvider credentials.JWTSourceProvider
+	STSProvider       credentials.STSProvider
+}
+
+func (c *CredentialsCmd) Run(context *CliContext) error {
 	spiffeID, err := spiffeid.FromString(c.SpiffeID)
 	if err != nil {
 		return err
 	}
 
-	src := credentials.NewJWTSVIDSource(spiffeID, c.WorkloadSocket, c.Audience)
+	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience)
 
-	provider, err := credentials.NewProvider(c.Audience, c.RoleARN, src)
+	provider, err := credentials.NewProvider(
+		c.Audience,
+		c.RoleARN,
+		src,
+		c.SessionDuration,
+		context.STSProvider)
 	if err != nil {
 		return err
 	}
@@ -40,24 +53,41 @@ func (c *CredentialsCmd) Run() error {
 	return err
 }
 
-var CLI struct {
+type CLI struct {
 	Credentials CredentialsCmd `kong:"cmd,help:'print credentials in a format usable as an AWS credentials_process'"`
 }
 
-func Run(args []string) error {
-	p, err := kong.New(&CLI)
+func RunWithDefaultContext(args []string) error {
+	context := &CliContext{
+		JWTSourceProvider: credentials.StandardJWTSourceProvider,
+		STSProvider:       credentials.StandardSTSProvider,
+	}
+
+	return Run(context, args)
+}
+
+func Run(context *CliContext, args []string) error {
+	ctx, err := parse(args)
 	if err != nil {
 		return err
 	}
 
-	ctx, err := p.Parse(args)
-	if err != nil {
-		return err
-	}
-
-	if err = ctx.Run(); err != nil {
+	if err = ctx.Run(context); err != nil {
 		return err
 	}
 
 	return nil
+}
+
+func newKong(cli *CLI) (*kong.Kong, error) {
+	return kong.New(cli, kong.NamedMapper(util.Iso8601DurationMapperType, util.Iso8601DurationMapper{}))
+}
+
+func parse(args []string) (*kong.Context, error) {
+	parser, err := newKong(&CLI{})
+	if err != nil {
+		return nil, err
+	}
+
+	return parser.Parse(args)
 }
