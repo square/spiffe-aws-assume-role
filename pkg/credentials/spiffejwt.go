@@ -7,6 +7,7 @@ import (
 
 	"google.golang.org/grpc"
 
+	"github.com/pkg/errors"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/jwtsvid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
@@ -17,6 +18,8 @@ const (
 )
 
 type JWTSVIDSource struct {
+	JWTSource
+
 	subject        spiffeid.ID
 	audience       string
 	workloadSocket string
@@ -42,7 +45,7 @@ func (jss *JWTSVIDSource) FetchToken(ctx context.Context) (string, error) {
 
 	jwtSource, err := workloadapi.NewJWTSource(ctx, dialOpts...)
 	if err != nil {
-		return "", fmt.Errorf("creating JWT-SVID source: %w", err)
+		return "", errors.Wrap(err, "creating JWT-SVID source")
 	}
 
 	jwt, err := jwtSource.FetchJWTSVID(ctx, jwtsvid.Params{

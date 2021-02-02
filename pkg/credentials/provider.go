@@ -8,24 +8,27 @@ import (
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go/service/sts/stsiface"
+	"github.com/pkg/errors"
 )
 
-// JWTSource is the interface this provider uses to fetch JWTs.
-type JWTSource interface {
-	// FetchToken returns a token
-	FetchToken(ctx context.Context) (string, error)
-}
+func NewProvider(
+	audience string,
+	roleARN string,
+	jwtSource JWTSource,
+	sessionDuration time.Duration,
+	stsProvider STSProvider) (*Provider, error) {
 
-func NewProvider(audience, roleARN string, jwtSource JWTSource) (*Provider, error) {
 	mySession := session.Must(session.NewSession())
 
 	cfg := Provider{
-		Expiry:      credentials.Expiry{},
-		stsClient:   sts.New(mySession),
-		audience:    audience,
-		RoleARN:     roleARN,
-		RenewWindow: time.Minute, // Default to 1 minute pre-renew. This avoids in-flight requests expiring.
-		jwtSource:   jwtSource,
+		Expiry:          credentials.Expiry{},
+		stsClient:       stsProvider(mySession),
+		audience:        audience,
+		RoleARN:         roleARN,
+		RenewWindow:     time.Minute, // Default to 1 minute pre-renew. This avoids in-flight requests expiring.
+		jwtSource:       jwtSource,
+		SessionDuration: sessionDuration,
 	}
 
 	return &cfg, nil
@@ -34,7 +37,7 @@ func NewProvider(audience, roleARN string, jwtSource JWTSource) (*Provider, erro
 type Provider struct {
 	credentials.Expiry
 
-	stsClient *sts.STS
+	stsClient stsiface.STSAPI
 	jwtSource JWTSource
 
 	audience string
@@ -62,7 +65,7 @@ func (sp *Provider) Retrieve() (credentials.Value, error) {
 
 	out, err := sp.assumeRole(ctx, token)
 	if err != nil {
-		return credentials.Value{}, err
+		return credentials.Value{}, errors.Wrap(err, "failed to assume role")
 	}
 
 	sp.Expiry.SetExpiration(*out.Credentials.Expiration, sp.RenewWindow)

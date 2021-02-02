@@ -8,7 +8,7 @@ import (
 )
 
 func main() {
-	if err := cli.Run(os.Args[1:]); err != nil {
+	if err := cli.RunWithDefaultContext(os.Args[1:]); err != nil {
 		_, _ = fmt.Fprintf(os.Stderr, "error: %v\n", err)
 		os.Exit(1)
 	}
