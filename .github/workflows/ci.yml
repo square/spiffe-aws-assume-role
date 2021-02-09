@@ -1,5 +1,5 @@
-name: workflow
-on: [pull_request]
+name: CI
+on: [pull_request, push]
 jobs:
   job:
     runs-on: ubuntu-latest
