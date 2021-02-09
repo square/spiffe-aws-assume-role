@@ -6,9 +6,9 @@ import (
 
 	"github.com/alecthomas/kong"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
+	"github.com/square/spiffe-aws-assume-role/cmd/spiffe-aws-assume-role/cli/mappers"
 	"github.com/square/spiffe-aws-assume-role/pkg/credentials"
 	"github.com/square/spiffe-aws-assume-role/pkg/processcreds"
-	"github.com/square/spiffe-aws-assume-role/pkg/util"
 )
 
 type CredentialsCmd struct {
@@ -80,7 +80,7 @@ func Run(context *CliContext, args []string) error {
 }
 
 func newKong(cli *CLI) (*kong.Kong, error) {
-	return kong.New(cli, kong.NamedMapper(util.Iso8601DurationMapperType, util.Iso8601DurationMapper{}))
+	return kong.New(cli, kong.NamedMapper(mappers.Iso8601DurationMapperType, mappers.Iso8601DurationMapper{}))
 }
 
 func parse(args []string) (*kong.Context, error) {
