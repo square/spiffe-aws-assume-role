@@ -12,13 +12,13 @@ import (
 )
 
 type CredentialsCmd struct {
-	Audience        string        `required help:"SVID JWT Audience. Must match AWS configuration"`
-	SpiffeID        string        `required help:"The SPIFFE ID of this workload"`
-	WorkloadSocket  string        `optional help:"Path to SPIFFE Workload Socket"`
-	RoleARN         string        `required help:"AWS Role ARN to assume"`
-	SessionName     string        `optional help:"AWS Session Name"`
-	STSEndpoint     string        `optional help:"AWS STS Endpoint variable"`
-	SessionDuration time.Duration `optional type:iso8601duration help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
+	Audience        string        `required:"" help:"SVID JWT Audience. Must match AWS configuration"`
+	SpiffeID        string        `required:"" help:"The SPIFFE ID of this workload"`
+	WorkloadSocket  string        `optional:"" help:"Path to SPIFFE Workload Socket"`
+	RoleARN         string        `required:"" help:"AWS Role ARN to assume"`
+	SessionName     string        `optional:"" help:"AWS Session Name"`
+	STSEndpoint     string        `optional:"" help:"AWS STS Endpoint variable"`
+	SessionDuration time.Duration `optional:"" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
 }
 
 type CliContext struct {
