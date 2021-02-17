@@ -87,7 +87,8 @@ func TestRetrieveSetsExpirationOnCredentials(t *testing.T) {
 	provider, err := NewProvider(audience, roleArn, &jwtSource, sessionDuration, stsProvider)
 	require.NoError(t, err)
 
-	provider.Retrieve()
+	_, err = provider.Retrieve()
+	require.NoError(t, err)
 
 	require.EqualValues(t,
 		expiration.Round(0).Add(-time.Minute),
