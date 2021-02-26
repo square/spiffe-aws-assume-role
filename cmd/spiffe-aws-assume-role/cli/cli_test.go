@@ -26,7 +26,8 @@ func TestErrorLogging(t *testing.T) {
 
 	badArgument := uuid.New().String()
 	args := []string{badArgument}
-	RunWithDefaultContext(args)
+	err := RunWithDefaultContext(args)
+	require.Error(t, err)
 
 	bytes, err := ioutil.ReadFile(logFileName)
 	require.NoError(t, err)
