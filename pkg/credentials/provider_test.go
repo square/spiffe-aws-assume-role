@@ -7,11 +7,18 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go/service/sts/stsiface"
+	"github.com/google/uuid"
 	"github.com/square/spiffe-aws-assume-role/internal/mocks"
 	"github.com/square/spiffe-aws-assume-role/internal/test"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
+)
+
+const (
+	defaultEndpoint = ""
 )
 
 func TestPassesSessionDurationToStsAssumeRole(t *testing.T) {
@@ -47,9 +54,39 @@ func TestNewProviderAssignsSessionDuration(t *testing.T) {
 
 	stsProvider := StaticSTSProvider(nil)
 
-	provider, err := NewProvider(audience, roleArn, jwtSource, nonZeroSessionDuration, stsProvider)
+	provider, err := NewProvider(
+		audience,
+		roleArn,
+		jwtSource,
+		nonZeroSessionDuration,
+		stsProvider,
+		defaultEndpoint)
 	require.NoError(t, err)
 	require.Equal(t, nonZeroSessionDuration, provider.SessionDuration)
+}
+
+func TestNewProviderAssignsStsEndpoint(t *testing.T) {
+	endpoint := uuid.New().String()
+
+	var audience, roleArn string
+	var jwtSource JWTSource
+	var sessionDuration time.Duration
+
+	var _session *session.Session
+	stsProvider := func(s *session.Session) stsiface.STSAPI {
+		_session = s
+		return nil
+	}
+
+	_, err := NewProvider(
+		audience,
+		roleArn,
+		jwtSource,
+		sessionDuration,
+		stsProvider,
+		endpoint)
+	require.NoError(t, err)
+	require.EqualValues(t, endpoint, *_session.Config.Endpoint)
 }
 
 func TestRetrieveSetsExpirationOnCredentials(t *testing.T) {
@@ -84,7 +121,13 @@ func TestRetrieveSetsExpirationOnCredentials(t *testing.T) {
 
 	stsProvider := StaticSTSProvider(&stsClient)
 
-	provider, err := NewProvider(audience, roleArn, &jwtSource, sessionDuration, stsProvider)
+	provider, err := NewProvider(
+		audience,
+		roleArn,
+		&jwtSource,
+		sessionDuration,
+		stsProvider,
+		defaultEndpoint)
 	require.NoError(t, err)
 
 	_, err = provider.Retrieve()
@@ -123,6 +166,17 @@ func TestAssumeRoleAppendsPolicies(t *testing.T) {
 
 	require.EqualValues(t, policyArn1, *input.PolicyArns[0].Arn)
 	require.EqualValues(t, policyArn2, *input.PolicyArns[1].Arn)
+}
+
+func TestCreatesSessionWithEmptyEndpoint(t *testing.T) {
+	require.NotNil(t, createSession(""))
+}
+
+func TestCreatesSessionWithCustomEndpoint(t *testing.T) {
+	endpoint := uuid.New().String()
+	s := createSession(endpoint)
+	require.NotNil(t, s)
+	require.EqualValues(t, endpoint, *s.Config.Endpoint)
 }
 
 func randomInt32(maxExclusive int32) int32 {

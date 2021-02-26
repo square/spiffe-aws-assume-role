@@ -7,6 +7,7 @@ require (
 	github.com/aws/aws-sdk-go v1.37.1
 	github.com/channelmeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
 	github.com/google/go-cmp v0.3.0 // indirect
+	github.com/google/uuid v1.2.0
 	github.com/kr/pretty v0.2.0 // indirect
 	github.com/pkg/errors v0.9.1
 	github.com/spiffe/go-spiffe/v2 v2.0.0-beta.2
