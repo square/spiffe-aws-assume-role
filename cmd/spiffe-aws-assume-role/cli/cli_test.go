@@ -1,11 +1,15 @@
 package cli
 
 import (
+	"fmt"
 	"testing"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
+	"github.com/aws/aws-sdk-go/service/sts/stsiface"
+	"github.com/google/uuid"
 	"github.com/square/spiffe-aws-assume-role/internal/mocks"
 	"github.com/square/spiffe-aws-assume-role/internal/test"
 	"github.com/square/spiffe-aws-assume-role/pkg/credentials"
@@ -28,6 +32,24 @@ func TestParsesSessionDuration(t *testing.T) {
 	cli := context.Model.Target.Interface().(CLI)
 	sessionDuration := cli.Credentials.SessionDuration
 	require.EqualValues(t, 5, sessionDuration.Minutes())
+}
+
+func TestParsesStsEndpoint(t *testing.T) {
+	stsEndpoint := uuid.New().String()
+
+	args := []string{
+		"credentials",
+		fmt.Sprintf("--sts-endpoint=%s", stsEndpoint),
+		// We only specify the following fields because they're required
+		"--audience=foo",
+		"--role-arn=bar",
+		"--spiffe-id=baz",
+	}
+	context, err := parse(args)
+	require.NoError(t, err)
+
+	cli := context.Model.Target.Interface().(CLI)
+	require.EqualValues(t, stsEndpoint, cli.Credentials.STSEndpoint)
 }
 
 func TestDisplaysTopLevelHelp(t *testing.T) {
@@ -100,6 +122,58 @@ func TestSetsCustomSessionDuration(t *testing.T) {
 
 	input := captor.Args.Get(1).(*sts.AssumeRoleWithWebIdentityInput)
 	require.EqualValues(t, 300, *input.DurationSeconds)
+}
+
+func TestSetsCustomStsEndpoint(t *testing.T) {
+	stsEndpoint := uuid.New().String()
+
+	args := []string{
+		"credentials",
+		"--audience=foo",
+		"--role-arn=arn:aws:iam:123456789012:role/foo",
+		fmt.Sprintf("--sts-endpoint=%s", stsEndpoint),
+		"--spiffe-id=spiffe://foo",
+		"--workload-socket=tcp://127.0.0.1:8080",
+	}
+
+	jwtSource := mocks.JWTSource{}
+	defer jwtSource.AssertExpectations(t)
+	jwtSource.
+		On("FetchToken", mock.Anything).
+		Return("token", nil)
+
+	stsClient := mocks.STSAPI{}
+	defer stsClient.AssertExpectations(t)
+
+	stsCredentials := sts.Credentials{
+		AccessKeyId:     aws.String(""),
+		Expiration:      aws.Time(time.Now()),
+		SecretAccessKey: aws.String(""),
+		SessionToken:    aws.String(""),
+	}
+
+	output := sts.AssumeRoleWithWebIdentityOutput{
+		Credentials: &stsCredentials,
+	}
+
+	stsClient.
+		On("AssumeRoleWithWebIdentityWithContext", mock.Anything, mock.Anything).
+		Return(&output, nil)
+
+	var _session *session.Session
+	stsProvider := func(s *session.Session) stsiface.STSAPI {
+		_session = s
+		return &stsClient
+	}
+
+	context := CliContext{
+		JWTSourceProvider: credentials.StaticJWTSourceProvider(&jwtSource),
+		STSProvider:       stsProvider,
+	}
+
+	failOnError(t, Run(&context, args))
+
+	require.EqualValues(t, stsEndpoint, *_session.Config.Endpoint)
 }
 
 func failOnError(t *testing.T, err error) {

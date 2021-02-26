@@ -39,7 +39,8 @@ func (c *CredentialsCmd) Run(context *CliContext) error {
 		c.RoleARN,
 		src,
 		c.SessionDuration,
-		context.STSProvider)
+		context.STSProvider,
+		c.STSEndpoint)
 	if err != nil {
 		return err
 	}

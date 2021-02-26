@@ -17,9 +17,10 @@ func NewProvider(
 	roleARN string,
 	jwtSource JWTSource,
 	sessionDuration time.Duration,
-	stsProvider STSProvider) (*Provider, error) {
+	stsProvider STSProvider,
+	stsEndpoint string) (*Provider, error) {
 
-	mySession := session.Must(session.NewSession())
+	mySession := createSession(stsEndpoint)
 
 	cfg := Provider{
 		Expiry:          credentials.Expiry{},
@@ -32,6 +33,20 @@ func NewProvider(
 	}
 
 	return &cfg, nil
+}
+
+func createSession(stsEndpoint string) *session.Session {
+	var config *aws.Config
+
+	if len(stsEndpoint) > 0 {
+		config = &aws.Config{
+			Endpoint: aws.String(stsEndpoint),
+		}
+	} else {
+		config = &aws.Config{}
+	}
+
+	return session.Must(session.NewSession(config))
 }
 
 type Provider struct {
