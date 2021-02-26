@@ -2,7 +2,6 @@ package credentials
 
 import (
 	"context"
-	"fmt"
 	"time"
 
 	"google.golang.org/grpc"
@@ -53,7 +52,7 @@ func (jss *JWTSVIDSource) FetchToken(ctx context.Context) (string, error) {
 		Subject:  jss.subject,
 	})
 	if err != nil {
-		return "", fmt.Errorf("retrieving JWT-SVID: %w", err)
+		return "", errors.Wrap(err, "retrieving JWT-SVID")
 	}
 
 	return jwt.Marshal(), nil

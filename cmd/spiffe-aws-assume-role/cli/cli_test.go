@@ -2,6 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -16,6 +19,20 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+func TestErrorLogging(t *testing.T) {
+	deleteFileIfExists(t, logFileName)
+	defer deleteFileIfExists(t, logFileName)
+
+	badArgument := uuid.New().String()
+	args := []string{badArgument}
+	RunWithDefaultContext(args)
+
+	bytes, err := ioutil.ReadFile(logFileName)
+	require.NoError(t, err)
+	logs := string(bytes)
+	require.True(t, strings.Contains(logs, badArgument))
+}
 
 func TestParsesSessionDuration(t *testing.T) {
 	args := []string{
@@ -260,5 +277,12 @@ func TestCreatesSessionWithCustomEndpointAndRegion(t *testing.T) {
 func failOnError(t *testing.T, err error) {
 	if err != nil {
 		t.Fatalf("%+v", err)
+	}
+}
+
+func deleteFileIfExists(t *testing.T, filename string) {
+	_, err := os.Stat(filename)
+	if err == nil {
+		require.NoError(t, os.Remove(filename), fmt.Sprintf("failed to delete file %s", filename))
 	}
 }

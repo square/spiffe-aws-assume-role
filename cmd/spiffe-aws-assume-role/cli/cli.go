@@ -2,15 +2,22 @@ package cli
 
 import (
 	"fmt"
+	"os"
 	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/square/spiffe-aws-assume-role/cmd/spiffe-aws-assume-role/cli/mappers"
 	"github.com/square/spiffe-aws-assume-role/pkg/credentials"
 	"github.com/square/spiffe-aws-assume-role/pkg/processcreds"
+)
+
+const (
+	logFileName = "spiffe-aws-assume-role.log"
 )
 
 type CredentialsCmd struct {
@@ -32,7 +39,7 @@ type CliContext struct {
 func (c *CredentialsCmd) Run(context *CliContext) error {
 	spiffeID, err := spiffeid.FromString(c.SpiffeID)
 	if err != nil {
-		return err
+		return errors.Wrap(err, fmt.Sprintf("failed to parse SPIFFE ID from %s", c.SpiffeID))
 	}
 
 	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience)
@@ -47,12 +54,12 @@ func (c *CredentialsCmd) Run(context *CliContext) error {
 		c.SessionDuration,
 		stsClient)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to instantiate credentials provider")
 	}
 
 	creds, err := processcreds.SerializeCredentials(provider)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to serialize credentials")
 	}
 
 	_, err = fmt.Print(string(creds))
@@ -73,9 +80,19 @@ func RunWithDefaultContext(args []string) error {
 }
 
 func Run(context *CliContext, args []string) error {
+	err := doRun(context, args)
+	if err != nil {
+		logger := createLogger()
+		logger.Error(err)
+	}
+
+	return err
+}
+
+func doRun(context *CliContext, args []string) error {
 	ctx, err := parse(args)
 	if err != nil {
-		return err
+		return errors.Wrap(err, fmt.Sprintf("failed to parse command line arguments: %s", args))
 	}
 
 	if err = ctx.Run(context); err != nil {
@@ -110,4 +127,19 @@ func createSession(stsEndpoint string, stsRegion string) *session.Session {
 	}
 
 	return session.Must(session.NewSession(config))
+}
+
+func createLogger() *logrus.Logger {
+	logger := logrus.New()
+	logger.SetFormatter(&logrus.TextFormatter{})
+
+	file, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+	if err != nil {
+		logger.Out = os.Stdout
+		logger.Info("Failed to log to file, using default of stdout")
+	} else {
+		logger.Out = file
+	}
+
+	return logger
 }
