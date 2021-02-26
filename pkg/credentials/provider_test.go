@@ -17,7 +17,9 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const defaultEndpoint string = ""
+const (
+	defaultEndpoint = ""
+)
 
 func TestPassesSessionDurationToStsAssumeRole(t *testing.T) {
 	stsClient := mocks.STSAPI{}
