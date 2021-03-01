@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+	"io"
 	"os"
 	"time"
 
@@ -34,6 +35,7 @@ type CredentialsCmd struct {
 type CliContext struct {
 	JWTSourceProvider credentials.JWTSourceProvider
 	STSProvider       credentials.STSProvider
+	Logger            *logrus.Logger
 }
 
 func (c *CredentialsCmd) Run(context *CliContext) error {
@@ -42,7 +44,7 @@ func (c *CredentialsCmd) Run(context *CliContext) error {
 		return errors.Wrap(err, fmt.Sprintf("failed to parse SPIFFE ID from %s", c.SpiffeID))
 	}
 
-	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience)
+	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience, context.Logger)
 
 	session := createSession(c.STSEndpoint, c.STSRegion)
 	stsClient := context.STSProvider(session)
@@ -74,32 +76,27 @@ func RunWithDefaultContext(args []string) error {
 	context := &CliContext{
 		JWTSourceProvider: credentials.StandardJWTSourceProvider,
 		STSProvider:       credentials.StandardSTSProvider,
+		Logger:            createLogger(),
 	}
 
 	return Run(context, args)
 }
 
-func Run(context *CliContext, args []string) error {
-	err := doRun(context, args)
-	if err != nil {
-		logger := createLogger()
-		logger.Error(err)
-	}
+func Run(context *CliContext, args []string) (err error) {
+	defer func() {
+		if err != nil {
+			context.Logger.Error(err)
+		}
+	}()
 
-	return err
-}
-
-func doRun(context *CliContext, args []string) error {
 	ctx, err := parse(args)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to parse command line arguments: %s", args))
 	}
 
-	if err = ctx.Run(context); err != nil {
-		return err
-	}
+	err = ctx.Run(context)
 
-	return nil
+	return err
 }
 
 func newKong(cli *CLI) (*kong.Kong, error) {
@@ -135,10 +132,9 @@ func createLogger() *logrus.Logger {
 
 	file, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
 	if err != nil {
-		logger.Out = os.Stdout
-		logger.Info("Failed to log to file, using default of stdout")
+		logger.Info(errors.Wrapf(err, "Failed to log to file %s, using default of stderr", logFileName))
 	} else {
-		logger.Out = file
+		logger.Out = io.MultiWriter(os.Stderr, file)
 	}
 
 	return logger
