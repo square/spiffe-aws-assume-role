@@ -14,10 +14,6 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-const (
-	defaultEndpoint = ""
-)
-
 func TestPassesSessionDurationToStsAssumeRole(t *testing.T) {
 	stsClient := mocks.STSAPI{}
 	defer stsClient.AssertExpectations(t)
