@@ -17,10 +17,6 @@ import (
 	"github.com/square/spiffe-aws-assume-role/pkg/processcreds"
 )
 
-const (
-	logFileName = "spiffe-aws-assume-role.log"
-)
-
 type CredentialsCmd struct {
 	Audience        string        `required:"" help:"SVID JWT Audience. Must match AWS configuration"`
 	SpiffeID        string        `required:"" help:"The SPIFFE ID of this workload"`
@@ -30,6 +26,7 @@ type CredentialsCmd struct {
 	STSEndpoint     string        `optional:"" help:"AWS STS Endpoint"`
 	STSRegion       string        `optional:"" help:"AWS STS Region"`
 	SessionDuration time.Duration `optional:"" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
+	LogFilePath     string        `optional:"" help:"Path to log file"`
 }
 
 type CliContext struct {
@@ -39,6 +36,8 @@ type CliContext struct {
 }
 
 func (c *CredentialsCmd) Run(context *CliContext) error {
+	c.configureLogger(context.Logger)
+
 	spiffeID, err := spiffeid.FromString(c.SpiffeID)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to parse SPIFFE ID from %s", c.SpiffeID))
@@ -68,15 +67,31 @@ func (c *CredentialsCmd) Run(context *CliContext) error {
 	return err
 }
 
+func (c *CredentialsCmd) configureLogger(logger *logrus.Logger) {
+	if len(c.LogFilePath) > 0 {
+		file, err := os.OpenFile(c.LogFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			logger.Info(errors.Wrapf(err, "Failed to log to file %s, using default of stderr", c.LogFilePath))
+		} else {
+			logger.Out = io.MultiWriter(os.Stderr, file)
+		}
+	}
+}
+
 type CLI struct {
 	Credentials CredentialsCmd `kong:"cmd,help:'print credentials in a format usable as an AWS credentials_process'"`
 }
 
 func RunWithDefaultContext(args []string) error {
+	logger := logrus.New()
+	// Example log line:
+	// time="2021-03-01T16:28:51-08:00" level=error msg="failed to parse SPIFFE ID from 305d07ed-765e-4642-9bd3-4c74aa86f5ed: spiffeid: invalid scheme"
+	logger.SetFormatter(&logrus.TextFormatter{})
+
 	context := &CliContext{
 		JWTSourceProvider: credentials.StandardJWTSourceProvider,
 		STSProvider:       credentials.StandardSTSProvider,
-		Logger:            createLogger(),
+		Logger:            logger,
 	}
 
 	return Run(context, args)
