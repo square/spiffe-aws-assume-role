@@ -2,6 +2,7 @@ package credentials
 
 import (
 	"context"
+	"fmt"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
@@ -57,12 +58,12 @@ func (sp *Provider) Retrieve() (credentials.Value, error) {
 
 	token, err := sp.jwtSource.FetchToken(ctx)
 	if err != nil {
-		return credentials.Value{}, err
+		return credentials.Value{}, errors.Wrap(err, "failed to fetch JSON Web Token")
 	}
 
 	out, err := sp.assumeRole(ctx, token)
 	if err != nil {
-		return credentials.Value{}, errors.Wrap(err, "failed to assume role")
+		return credentials.Value{}, errors.Wrap(err, fmt.Sprintf("failed to assume role %s", sp.RoleARN))
 	}
 
 	sp.Expiry.SetExpiration(*out.Credentials.Expiration, sp.RenewWindow)

@@ -10,9 +10,6 @@ import (
 )
 
 func TestStandardLibraryCannotParseIso8601Duration(t *testing.T) {
-	// Without this line the coverage instrumentation causes a panic
-	defer func() {}()
-
 	_, err := time.ParseDuration("PT5M")
 	require.Error(t, err, "Standard library was able to parse ISO8601 duration string, iso8601DurationMapper may no longer be needed")
 }

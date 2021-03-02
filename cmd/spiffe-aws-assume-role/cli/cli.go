@@ -2,11 +2,15 @@ package cli
 
 import (
 	"fmt"
+	"io"
+	"os"
 	"time"
 
 	"github.com/alecthomas/kong"
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/pkg/errors"
+	"github.com/sirupsen/logrus"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/square/spiffe-aws-assume-role/cmd/spiffe-aws-assume-role/cli/mappers"
 	"github.com/square/spiffe-aws-assume-role/pkg/credentials"
@@ -22,20 +26,24 @@ type CredentialsCmd struct {
 	STSEndpoint     string        `optional:"" help:"AWS STS Endpoint"`
 	STSRegion       string        `optional:"" help:"AWS STS Region"`
 	SessionDuration time.Duration `optional:"" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
+	LogFilePath     string        `optional:"" help:"Path to log file"`
 }
 
 type CliContext struct {
 	JWTSourceProvider credentials.JWTSourceProvider
 	STSProvider       credentials.STSProvider
+	Logger            *logrus.Logger
 }
 
 func (c *CredentialsCmd) Run(context *CliContext) error {
+	c.configureLogger(context.Logger)
+
 	spiffeID, err := spiffeid.FromString(c.SpiffeID)
 	if err != nil {
-		return err
+		return errors.Wrap(err, fmt.Sprintf("failed to parse SPIFFE ID from %s", c.SpiffeID))
 	}
 
-	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience)
+	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience, context.Logger)
 
 	session := createSession(c.STSEndpoint, c.STSRegion)
 	stsClient := context.STSProvider(session)
@@ -47,16 +55,27 @@ func (c *CredentialsCmd) Run(context *CliContext) error {
 		c.SessionDuration,
 		stsClient)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to instantiate credentials provider")
 	}
 
 	creds, err := processcreds.SerializeCredentials(provider)
 	if err != nil {
-		return err
+		return errors.Wrap(err, "failed to serialize credentials")
 	}
 
 	_, err = fmt.Print(string(creds))
 	return err
+}
+
+func (c *CredentialsCmd) configureLogger(logger *logrus.Logger) {
+	if len(c.LogFilePath) > 0 {
+		file, err := os.OpenFile(c.LogFilePath, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
+		if err != nil {
+			logger.Info(errors.Wrapf(err, "Failed to log to file %s, using default of stderr", c.LogFilePath))
+		} else {
+			logger.Out = io.MultiWriter(os.Stderr, file)
+		}
+	}
 }
 
 type CLI struct {
@@ -64,25 +83,35 @@ type CLI struct {
 }
 
 func RunWithDefaultContext(args []string) error {
+	logger := logrus.New()
+	// Example log line:
+	// time="2021-03-01T16:28:51-08:00" level=error msg="failed to parse SPIFFE ID from 305d07ed-765e-4642-9bd3-4c74aa86f5ed: spiffeid: invalid scheme"
+	logger.SetFormatter(&logrus.TextFormatter{})
+
 	context := &CliContext{
 		JWTSourceProvider: credentials.StandardJWTSourceProvider,
 		STSProvider:       credentials.StandardSTSProvider,
+		Logger:            logger,
 	}
 
 	return Run(context, args)
 }
 
-func Run(context *CliContext, args []string) error {
+func Run(context *CliContext, args []string) (err error) {
+	defer func() {
+		if err != nil {
+			context.Logger.Error(err)
+		}
+	}()
+
 	ctx, err := parse(args)
 	if err != nil {
-		return err
+		return errors.Wrap(err, fmt.Sprintf("failed to parse command line arguments: %s", args))
 	}
 
-	if err = ctx.Run(context); err != nil {
-		return err
-	}
+	err = ctx.Run(context)
 
-	return nil
+	return err
 }
 
 func newKong(cli *CLI) (*kong.Kong, error) {

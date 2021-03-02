@@ -2,6 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"io/ioutil"
+	"os"
+	"strings"
 	"testing"
 	"time"
 
@@ -17,39 +20,62 @@ import (
 	"github.com/stretchr/testify/require"
 )
 
-func TestParsesSessionDuration(t *testing.T) {
+var requiredArgs = []string{
+	"credentials",
+	"--audience=foo",
+	"--role-arn=bar",
+	"--spiffe-id=baz",
+}
+
+func TestErrorLogging(t *testing.T) {
+	const logFileName = "spiffe-aws-assume-role.log"
+
+	deleteFileIfExists(t, logFileName)
+	defer deleteFileIfExists(t, logFileName)
+
+	badSpiffeId := uuid.New().String()
+
 	args := []string{
 		"credentials",
-		"--session-duration=PT5M",
-		// We only specify the following fields because they're required
 		"--audience=foo",
 		"--role-arn=bar",
-		"--spiffe-id=baz",
+		fmt.Sprintf("--spiffe-id=%s", badSpiffeId),
+		fmt.Sprintf("--log-file-path=%s", logFileName),
 	}
-	context, err := parse(args)
-	require.NoError(t, err)
+	err := RunWithDefaultContext(args)
+	require.Error(t, err)
 
-	cli := context.Model.Target.Interface().(CLI)
-	sessionDuration := cli.Credentials.SessionDuration
-	require.EqualValues(t, 5, sessionDuration.Minutes())
+	bytes, err := ioutil.ReadFile(logFileName)
+	require.NoError(t, err)
+	logs := string(bytes)
+	require.True(t, strings.Contains(logs, badSpiffeId))
+}
+
+func TestParsesSessionDuration(t *testing.T) {
+	command := parseTest(t, "--session-duration=PT5M")
+	require.EqualValues(t, 5, command.SessionDuration.Minutes())
 }
 
 func TestParsesStsEndpoint(t *testing.T) {
 	stsEndpoint := uuid.New().String()
+	command := parseTest(t, fmt.Sprintf("--sts-endpoint=%s", stsEndpoint))
+	require.EqualValues(t, stsEndpoint, command.STSEndpoint)
+}
 
-	args := []string{
-		"credentials",
-		fmt.Sprintf("--sts-endpoint=%s", stsEndpoint),
-		// We only specify the following fields because they're required
-		"--audience=foo",
-		"--role-arn=bar",
-		"--spiffe-id=baz",
-	}
+func TestParsesLogFilePath(t *testing.T) {
+	logFilePath := uuid.New().String()
+	command := parseTest(t, fmt.Sprintf("--log-file-path=%s", logFilePath))
+	require.EqualValues(t, logFilePath, command.LogFilePath)
+}
+
+func parseTest(t *testing.T, arg string) CredentialsCmd {
+	args := append(requiredArgs, arg)
+
 	context, err := parse(args)
 	require.NoError(t, err)
 
 	cli := context.Model.Target.Interface().(CLI)
-	require.EqualValues(t, stsEndpoint, cli.Credentials.STSEndpoint)
+	return cli.Credentials
 }
 
 func TestParsesStsRegion(t *testing.T) {
@@ -260,5 +286,12 @@ func TestCreatesSessionWithCustomEndpointAndRegion(t *testing.T) {
 func failOnError(t *testing.T, err error) {
 	if err != nil {
 		t.Fatalf("%+v", err)
+	}
+}
+
+func deleteFileIfExists(t *testing.T, filename string) {
+	_, err := os.Stat(filename)
+	if err == nil {
+		require.NoError(t, os.Remove(filename), fmt.Sprintf("failed to delete file %s", filename))
 	}
 }
