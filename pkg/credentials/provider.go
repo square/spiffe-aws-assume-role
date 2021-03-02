@@ -6,7 +6,6 @@ import (
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
 	"github.com/pkg/errors"
@@ -17,14 +16,11 @@ func NewProvider(
 	roleARN string,
 	jwtSource JWTSource,
 	sessionDuration time.Duration,
-	stsProvider STSProvider,
-	stsEndpoint string) (*Provider, error) {
-
-	mySession := createSession(stsEndpoint)
+	stsClient stsiface.STSAPI) (*Provider, error) {
 
 	cfg := Provider{
 		Expiry:          credentials.Expiry{},
-		stsClient:       stsProvider(mySession),
+		stsClient:       stsClient,
 		audience:        audience,
 		RoleARN:         roleARN,
 		RenewWindow:     time.Minute, // Default to 1 minute pre-renew. This avoids in-flight requests expiring.
@@ -33,20 +29,6 @@ func NewProvider(
 	}
 
 	return &cfg, nil
-}
-
-func createSession(stsEndpoint string) *session.Session {
-	var config *aws.Config
-
-	if len(stsEndpoint) > 0 {
-		config = &aws.Config{
-			Endpoint: aws.String(stsEndpoint),
-		}
-	} else {
-		config = &aws.Config{}
-	}
-
-	return session.Must(session.NewSession(config))
 }
 
 type Provider struct {

@@ -5,6 +5,8 @@ import (
 	"time"
 
 	"github.com/alecthomas/kong"
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/square/spiffe-aws-assume-role/cmd/spiffe-aws-assume-role/cli/mappers"
 	"github.com/square/spiffe-aws-assume-role/pkg/credentials"
@@ -17,7 +19,8 @@ type CredentialsCmd struct {
 	WorkloadSocket  string        `optional:"" help:"Path to SPIFFE Workload Socket"`
 	RoleARN         string        `required:"" help:"AWS Role ARN to assume"`
 	SessionName     string        `optional:"" help:"AWS Session Name"`
-	STSEndpoint     string        `optional:"" help:"AWS STS Endpoint variable"`
+	STSEndpoint     string        `optional:"" help:"AWS STS Endpoint"`
+	STSRegion       string        `optional:"" help:"AWS STS Region"`
 	SessionDuration time.Duration `optional:"" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
 }
 
@@ -34,13 +37,15 @@ func (c *CredentialsCmd) Run(context *CliContext) error {
 
 	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience)
 
+	session := createSession(c.STSEndpoint, c.STSRegion)
+	stsClient := context.STSProvider(session)
+
 	provider, err := credentials.NewProvider(
 		c.Audience,
 		c.RoleARN,
 		src,
 		c.SessionDuration,
-		context.STSProvider,
-		c.STSEndpoint)
+		stsClient)
 	if err != nil {
 		return err
 	}
@@ -91,4 +96,18 @@ func parse(args []string) (*kong.Context, error) {
 	}
 
 	return parser.Parse(args)
+}
+
+func createSession(stsEndpoint string, stsRegion string) *session.Session {
+	config := &aws.Config{}
+
+	if len(stsEndpoint) > 0 {
+		config.Endpoint = aws.String(stsEndpoint)
+	}
+
+	if len(stsRegion) > 0 {
+		config.Region = aws.String(stsRegion)
+	}
+
+	return session.Must(session.NewSession(config))
 }
