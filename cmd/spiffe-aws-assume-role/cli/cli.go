@@ -140,17 +140,3 @@ func createSession(stsEndpoint string, stsRegion string) *session.Session {
 
 	return session.Must(session.NewSession(config))
 }
-
-func createLogger() *logrus.Logger {
-	logger := logrus.New()
-	logger.SetFormatter(&logrus.TextFormatter{})
-
-	file, err := os.OpenFile(logFileName, os.O_CREATE|os.O_WRONLY|os.O_APPEND, 0666)
-	if err != nil {
-		logger.Info(errors.Wrapf(err, "Failed to log to file %s, using default of stderr", logFileName))
-	} else {
-		logger.Out = io.MultiWriter(os.Stderr, file)
-	}
-
-	return logger
-}
