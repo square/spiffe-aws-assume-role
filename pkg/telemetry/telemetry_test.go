@@ -53,7 +53,7 @@ func TestInstrumentSuccess(t *testing.T) {
 	telemetry, err := NewTelemetryForSink(&metricSink)
 	require.NoError(t, err)
 
-	methodThatSucceeds(telemetry)
+	require.NoError(t, methodThatSucceeds(telemetry))
 
 	metricSink.AssertCalled(t, "IncrCounterWithLabels",
 		[]string{"spiffe-aws-assume-role", "foo", "bar", "Success"},
@@ -72,7 +72,7 @@ func TestInstrumentFailure(t *testing.T) {
 	telemetry, err := NewTelemetryForSink(&metricSink)
 	require.NoError(t, err)
 
-	methodThatFails(telemetry)
+	require.Error(t, methodThatFails(telemetry))
 
 	metricSink.AssertCalled(t, "IncrCounterWithLabels",
 		[]string{"spiffe-aws-assume-role", "foo", "bar", "Failure"},

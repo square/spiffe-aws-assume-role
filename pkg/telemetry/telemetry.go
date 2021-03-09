@@ -8,7 +8,6 @@ import (
 )
 
 const (
-	noAddress   = ""
 	noHostName  = ""
 	serviceName = "spiffe-aws-assume-role"
 
