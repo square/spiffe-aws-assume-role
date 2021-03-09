@@ -1,6 +1,7 @@
 package telemetry
 
 import (
+	"os"
 	"time"
 
 	metrics "github.com/armon/go-metrics"
@@ -18,7 +19,8 @@ const (
 )
 
 type Telemetry struct {
-	Metrics *metrics.Metrics
+	Metrics  *metrics.Metrics
+	hostname string
 }
 
 func NullTelemetry() (*Telemetry, error) {
@@ -43,6 +45,15 @@ func NewTelemetry(address string) (*Telemetry, error) {
 }
 
 func NewTelemetryForSink(sink metrics.MetricSink) (*Telemetry, error) {
+	hostname, err := os.Hostname()
+	if err != nil {
+		hostname = ""
+	}
+
+	return NewTelemetryForSinkAndHostname(sink, hostname)
+}
+
+func NewTelemetryForSinkAndHostname(sink metrics.MetricSink, hostname string) (*Telemetry, error) {
 	_metrics, err := metrics.New(metrics.DefaultConfig(serviceName), sink)
 	if err != nil {
 		return nil, err
@@ -50,7 +61,8 @@ func NewTelemetryForSink(sink metrics.MetricSink) (*Telemetry, error) {
 	_metrics.EnableHostname = false
 
 	telemetry := Telemetry{
-		Metrics: _metrics,
+		Metrics:  _metrics,
+		hostname: hostname,
 	}
 
 	return &telemetry, nil
@@ -70,15 +82,20 @@ func (t *Telemetry) Instrument(key []string, err *error) func() {
 	return func() {
 		latencyInMilliseconds := time.Since(start).Milliseconds()
 
-		t.Metrics.IncrCounter(copyAndAppend(key, calls), 1)
-		t.Metrics.SetGauge(copyAndAppend(key, latency), float32(latencyInMilliseconds))
+		var labels []metrics.Label
+		if len(t.hostname) > 0 {
+			labels = []metrics.Label{*newLabel("hostname", t.hostname)}
+		}
+
+		t.Metrics.IncrCounterWithLabels(copyAndAppend(key, calls), 1, labels)
+		t.Metrics.SetGaugeWithLabels(copyAndAppend(key, latency), float32(latencyInMilliseconds), labels)
 
 		if *err == nil {
-			t.Metrics.IncrCounter(copyAndAppend(key, success), 1)
-			t.Metrics.IncrCounter(copyAndAppend(key, failure), 0)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, success), 1, labels)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, failure), 0, labels)
 		} else {
-			t.Metrics.IncrCounter(copyAndAppend(key, success), 0)
-			t.Metrics.IncrCounter(copyAndAppend(key, failure), 1)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, success), 0, labels)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, failure), 1, labels)
 		}
 	}
 }
@@ -88,4 +105,11 @@ func copyAndAppend(source []string, values ...string) []string {
 	copy(dest, source)
 	dest = append(dest, values...)
 	return dest
+}
+
+func newLabel(name string, value string) *metrics.Label {
+	return &metrics.Label{
+		Name:  name,
+		Value: value,
+	}
 }

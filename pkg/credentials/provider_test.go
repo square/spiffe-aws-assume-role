@@ -2,7 +2,6 @@ package credentials
 
 import (
 	"context"
-	"github.com/square/spiffe-aws-assume-role/pkg/telemetry"
 	"math/rand"
 	"testing"
 	"time"
@@ -11,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/square/spiffe-aws-assume-role/internal/mocks"
 	"github.com/square/spiffe-aws-assume-role/internal/test"
+	"github.com/square/spiffe-aws-assume-role/pkg/telemetry"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )

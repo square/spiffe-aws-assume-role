@@ -6,12 +6,13 @@ import (
 	"time"
 
 	"github.com/armon/go-metrics"
+	"github.com/google/uuid"
 	"github.com/square/spiffe-aws-assume-role/internal/mocks"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
 
-var noLabels []metrics.Label = nil
+var anyLabels string = mock.Anything
 
 func TestInstrumentCalls(t *testing.T) {
 	metricSink := mocks.MetricSink{}
@@ -26,7 +27,7 @@ func TestInstrumentCalls(t *testing.T) {
 	metricSink.AssertCalled(t, "IncrCounterWithLabels",
 		[]string{"spiffe-aws-assume-role", "foo", "bar", "Calls"},
 		float32(1),
-		noLabels)
+		anyLabels)
 }
 
 func TestInstrumentLatency(t *testing.T) {
@@ -43,7 +44,7 @@ func TestInstrumentLatency(t *testing.T) {
 	metricSink.AssertCalled(t, "SetGaugeWithLabels",
 		[]string{"spiffe-aws-assume-role", "foo", "bar", "Latency"},
 		mock.MatchedBy(greaterThanOrEqualFloat32(1000)),
-		noLabels)
+		anyLabels)
 }
 
 func TestInstrumentSuccess(t *testing.T) {
@@ -58,11 +59,11 @@ func TestInstrumentSuccess(t *testing.T) {
 	metricSink.AssertCalled(t, "IncrCounterWithLabels",
 		[]string{"spiffe-aws-assume-role", "foo", "bar", "Success"},
 		float32(1),
-		noLabels)
+		anyLabels)
 	metricSink.AssertCalled(t, "IncrCounterWithLabels",
 		[]string{"spiffe-aws-assume-role", "foo", "bar", "Failure"},
 		float32(0),
-		noLabels)
+		anyLabels)
 }
 
 func TestInstrumentFailure(t *testing.T) {
@@ -77,11 +78,33 @@ func TestInstrumentFailure(t *testing.T) {
 	metricSink.AssertCalled(t, "IncrCounterWithLabels",
 		[]string{"spiffe-aws-assume-role", "foo", "bar", "Failure"},
 		float32(1),
-		noLabels)
+		anyLabels)
 	metricSink.AssertCalled(t, "IncrCounterWithLabels",
 		[]string{"spiffe-aws-assume-role", "foo", "bar", "Success"},
 		float32(0),
-		noLabels)
+		anyLabels)
+}
+
+func TestInstrumentHostname(t *testing.T) {
+	metricSink := mocks.MetricSink{}
+	allowAllCalls(&metricSink)
+
+	hostname := uuid.New().String()
+
+	telemetry, err := NewTelemetryForSinkAndHostname(&metricSink, hostname)
+	require.NoError(t, err)
+
+	telemetry.Instrument(nil, &err)()
+
+	hostnameLabel := []metrics.Label{{
+		Name:  "hostname",
+		Value: hostname,
+	}}
+
+	metricSink.AssertCalled(t, "IncrCounterWithLabels",
+		[]string{"spiffe-aws-assume-role", "Calls"},
+		float32(1),
+		hostnameLabel)
 }
 
 // These next two methods are intended to simulate typical usage patterns
