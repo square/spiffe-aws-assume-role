@@ -88,8 +88,12 @@ func (c *CredentialsCmd) configureLogger(logger *logrus.Logger) {
 	}
 }
 
-func (c *CredentialsCmd) configureTelemetry() (*telemetry.Telemetry, error) {
-	return telemetry.NewTelemetry(c.TelemetryAddress)
+func (c *CredentialsCmd) configureTelemetry() (t *telemetry.Telemetry, err error) {
+	t, err = telemetry.NewTelemetry(c.TelemetryAddress)
+	if err != nil && len(c.STSRegion) > 0 {
+		t.AddLabel("stsRegion", c.STSRegion)
+	}
+	return
 }
 
 type CLI struct {

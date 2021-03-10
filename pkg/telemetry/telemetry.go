@@ -19,12 +19,16 @@ const (
 )
 
 type Telemetry struct {
-	Metrics  *metrics.Metrics
-	hostname string
+	Metrics *metrics.Metrics
+	labels  []metrics.Label
+}
+
+func (t *Telemetry) AddLabel(name string, value string) {
+	t.labels = append(t.labels, metrics.Label{Name: name, Value: value})
 }
 
 func NullTelemetry() (*Telemetry, error) {
-	return NewTelemetryForSink(&metrics.BlackholeSink{})
+	return NewTelemetryForSinkAndHostname(&metrics.BlackholeSink{}, noHostName)
 }
 
 func MustNullTelemetry() *Telemetry {
@@ -60,9 +64,13 @@ func NewTelemetryForSinkAndHostname(sink metrics.MetricSink, hostname string) (*
 	}
 	_metrics.EnableHostname = false
 
+	var labels []metrics.Label
+	if len(hostname) > 0 {
+		labels = append(labels, *newLabel("hostname", hostname))
+	}
 	telemetry := Telemetry{
-		Metrics:  _metrics,
-		hostname: hostname,
+		Metrics: _metrics,
+		labels:  labels,
 	}
 
 	return &telemetry, nil
@@ -82,20 +90,15 @@ func (t *Telemetry) Instrument(key []string, err *error) func() {
 	return func() {
 		latencyInMilliseconds := time.Since(start).Milliseconds()
 
-		var labels []metrics.Label
-		if len(t.hostname) > 0 {
-			labels = []metrics.Label{*newLabel("hostname", t.hostname)}
-		}
-
-		t.Metrics.IncrCounterWithLabels(copyAndAppend(key, calls), 1, labels)
-		t.Metrics.SetGaugeWithLabels(copyAndAppend(key, latency), float32(latencyInMilliseconds), labels)
+		t.Metrics.IncrCounterWithLabels(copyAndAppend(key, calls), 1, t.labels)
+		t.Metrics.SetGaugeWithLabels(copyAndAppend(key, latency), float32(latencyInMilliseconds), t.labels)
 
 		if *err == nil {
-			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, success), 1, labels)
-			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, failure), 0, labels)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, success), 1, t.labels)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, failure), 0, t.labels)
 		} else {
-			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, success), 0, labels)
-			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, failure), 1, labels)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, success), 0, t.labels)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, failure), 1, t.labels)
 		}
 	}
 }

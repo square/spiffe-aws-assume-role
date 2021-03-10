@@ -107,6 +107,62 @@ func TestInstrumentHostname(t *testing.T) {
 		hostnameLabel)
 }
 
+func TestInstrumentLabel(t *testing.T) {
+	metricSink := mocks.MetricSink{}
+	allowAllCalls(&metricSink)
+
+	telemetry, err := NewTelemetryForSinkAndHostname(&metricSink, noHostName)
+	require.NoError(t, err)
+
+	labelName := uuid.New().String()
+	labelValue := uuid.New().String()
+	telemetry.AddLabel(labelName, labelValue)
+
+	telemetry.Instrument(nil, &err)()
+
+	labels := []metrics.Label{{
+		Name:  labelName,
+		Value: labelValue,
+	}}
+
+	metricSink.AssertCalled(t, "IncrCounterWithLabels",
+		[]string{"spiffe-aws-assume-role", "Calls"},
+		float32(1),
+		labels)
+}
+
+func TestInstrumentLabelAndHostname(t *testing.T) {
+	metricSink := mocks.MetricSink{}
+	allowAllCalls(&metricSink)
+
+	hostname := uuid.New().String()
+
+	telemetry, err := NewTelemetryForSinkAndHostname(&metricSink, hostname)
+	require.NoError(t, err)
+
+	labelName := uuid.New().String()
+	labelValue := uuid.New().String()
+	telemetry.AddLabel(labelName, labelValue)
+
+	telemetry.Instrument(nil, &err)()
+
+	labels := []metrics.Label{
+		{
+			Name:  "hostname",
+			Value: hostname,
+		},
+		{
+			Name:  labelName,
+			Value: labelValue,
+		},
+	}
+
+	metricSink.AssertCalled(t, "IncrCounterWithLabels",
+		[]string{"spiffe-aws-assume-role", "Calls"},
+		float32(1),
+		labels)
+}
+
 // These next two methods are intended to simulate typical usage patterns
 
 func methodThatSucceeds(t *Telemetry) (err error) {
