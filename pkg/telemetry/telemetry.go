@@ -82,21 +82,21 @@ func newSink(socket string) (metrics.MetricSink, error) {
 	}
 }
 
-func (t *Telemetry) Instrument(key []string, err *error) func() {
+func (t *Telemetry) Instrument(baseMetricName []string, err *error) func() {
 	start := time.Now()
 
 	return func() {
 		latencyInMilliseconds := time.Since(start).Milliseconds()
 
-		t.Metrics.IncrCounterWithLabels(copyAndAppend(key, calls), 1, t.labels)
-		t.Metrics.SetGaugeWithLabels(copyAndAppend(key, latency), float32(latencyInMilliseconds), t.labels)
+		t.Metrics.IncrCounterWithLabels(copyAndAppend(baseMetricName, calls), 1, t.labels)
+		t.Metrics.SetGaugeWithLabels(copyAndAppend(baseMetricName, latency), float32(latencyInMilliseconds), t.labels)
 
 		if *err == nil {
-			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, success), 1, t.labels)
-			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, failure), 0, t.labels)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(baseMetricName, success), 1, t.labels)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(baseMetricName, failure), 0, t.labels)
 		} else {
-			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, success), 0, t.labels)
-			t.Metrics.IncrCounterWithLabels(copyAndAppend(key, failure), 1, t.labels)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(baseMetricName, success), 0, t.labels)
+			t.Metrics.IncrCounterWithLabels(copyAndAppend(baseMetricName, failure), 1, t.labels)
 		}
 	}
 }
