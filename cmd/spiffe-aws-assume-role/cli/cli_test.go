@@ -51,10 +51,10 @@ func TestErrorLogging(t *testing.T) {
 	require.True(t, strings.Contains(logs, badSpiffeId))
 }
 
-func TestParsesTelemetryAddress(t *testing.T) {
-	telemetryAddress := "127.0.0.1:8200"
-	command := parseTest(t, fmt.Sprintf("--telemetry-address=%s", telemetryAddress))
-	require.EqualValues(t, telemetryAddress, command.TelemetryAddress)
+func TestParsesTelemetrySocket(t *testing.T) {
+	telemetrySocket := "127.0.0.1:8200"
+	command := parseTest(t, fmt.Sprintf("--telemetry-socket=%s", telemetrySocket))
+	require.EqualValues(t, telemetrySocket, command.TelemetrySocket)
 }
 
 func TestParsesSessionDuration(t *testing.T) {

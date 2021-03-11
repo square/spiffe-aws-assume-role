@@ -19,16 +19,16 @@ import (
 )
 
 type CredentialsCmd struct {
-	Audience         string        `required:"" help:"SVID JWT Audience. Must match AWS configuration"`
-	SpiffeID         string        `required:"" help:"The SPIFFE ID of this workload"`
-	WorkloadSocket   string        `optional:"" help:"Path to SPIFFE Workload Socket"`
-	RoleARN          string        `required:"" help:"AWS Role ARN to assume"`
-	SessionName      string        `optional:"" help:"AWS Session Name"`
-	STSEndpoint      string        `optional:"" help:"AWS STS Endpoint"`
-	STSRegion        string        `optional:"" help:"AWS STS Region"`
-	SessionDuration  time.Duration `optional:"" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
-	LogFilePath      string        `optional:"" help:"Path to log file"`
-	TelemetryAddress string        `optional:"" help:"Socket address (TCP/UNIX) to emit metrics to (e.g. 127.0.0.1:8200)"`
+	Audience        string        `required:"" help:"SVID JWT Audience. Must match AWS configuration"`
+	SpiffeID        string        `required:"" help:"The SPIFFE ID of this workload"`
+	WorkloadSocket  string        `optional:"" help:"Path to SPIFFE Workload Socket"`
+	RoleARN         string        `required:"" help:"AWS Role ARN to assume"`
+	SessionName     string        `optional:"" help:"AWS Session Name"`
+	STSEndpoint     string        `optional:"" help:"AWS STS Endpoint"`
+	STSRegion       string        `optional:"" help:"AWS STS Region"`
+	SessionDuration time.Duration `optional:"" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
+	LogFilePath     string        `optional:"" help:"Path to log file"`
+	TelemetrySocket string        `optional:"" help:"Socket address (TCP/UNIX) to emit metrics to (e.g. 127.0.0.1:8200)"`
 }
 
 type CliContext struct {
@@ -43,7 +43,7 @@ func (c *CredentialsCmd) Run(context *CliContext) error {
 
 	telemetry, err := c.configureTelemetry()
 	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to configure telemetry for address %s", c.TelemetryAddress))
+		return errors.Wrap(err, fmt.Sprintf("failed to configure telemetry for socket address %s", c.TelemetrySocket))
 	}
 	context.Telemetry = telemetry
 
@@ -89,7 +89,7 @@ func (c *CredentialsCmd) configureLogger(logger *logrus.Logger) {
 }
 
 func (c *CredentialsCmd) configureTelemetry() (t *telemetry.Telemetry, err error) {
-	t, err = telemetry.NewTelemetry(c.TelemetryAddress)
+	t, err = telemetry.NewTelemetry(c.TelemetrySocket)
 	if err != nil && len(c.STSRegion) > 0 {
 		t.AddLabel("stsRegion", c.STSRegion)
 	}

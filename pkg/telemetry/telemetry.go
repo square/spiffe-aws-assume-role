@@ -39,8 +39,8 @@ func MustNullTelemetry() *Telemetry {
 	return telemetry
 }
 
-func NewTelemetry(address string) (*Telemetry, error) {
-	sink, err := newSink(address)
+func NewTelemetry(socket string) (*Telemetry, error) {
+	sink, err := newSink(socket)
 	if err != nil {
 		return nil, err
 	}
@@ -76,11 +76,11 @@ func NewTelemetryForSinkAndHostname(sink metrics.MetricSink, hostname string) (*
 	return &telemetry, nil
 }
 
-func newSink(address string) (metrics.MetricSink, error) {
-	if address == "" {
+func newSink(socket string) (metrics.MetricSink, error) {
+	if socket == "" {
 		return &metrics.BlackholeSink{}, nil
 	} else {
-		return datadog.NewDogStatsdSink(address, noHostName)
+		return datadog.NewDogStatsdSink(socket, noHostName)
 	}
 }
 
