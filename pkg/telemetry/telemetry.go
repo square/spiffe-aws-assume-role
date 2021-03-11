@@ -64,13 +64,11 @@ func NewTelemetryForSinkAndHostname(sink metrics.MetricSink, hostname string) (*
 	}
 	_metrics.EnableHostname = false
 
-	var labels []metrics.Label
-	if len(hostname) > 0 {
-		labels = append(labels, *newLabel("hostname", hostname))
-	}
 	telemetry := Telemetry{
 		Metrics: _metrics,
-		labels:  labels,
+	}
+	if len(hostname) > 0 {
+		telemetry.AddLabel("hostname", hostname)
 	}
 
 	return &telemetry, nil
