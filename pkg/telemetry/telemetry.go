@@ -9,7 +9,7 @@ import (
 
 const (
 	noHostName  = ""
-	serviceName = "spiffe-aws-assume-role"
+	serviceName = "SpiffeAwsAssumeRole"
 
 	calls   = "Calls"
 	failure = "Failure"
