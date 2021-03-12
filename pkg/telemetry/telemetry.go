@@ -107,10 +107,3 @@ func copyAndAppend(source []string, values ...string) []string {
 	dest = append(dest, values...)
 	return dest
 }
-
-func newLabel(name string, value string) *metrics.Label {
-	return &metrics.Label{
-		Name:  name,
-		Value: value,
-	}
-}
