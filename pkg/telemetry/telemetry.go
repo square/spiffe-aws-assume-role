@@ -1,7 +1,6 @@
 package telemetry
 
 import (
-	"os"
 	"time"
 
 	metrics "github.com/armon/go-metrics"
@@ -28,7 +27,7 @@ func (t *Telemetry) AddLabel(name string, value string) {
 }
 
 func NullTelemetry() (*Telemetry, error) {
-	return NewTelemetryForSinkAndHostname(&metrics.BlackholeSink{}, noHostName)
+	return NewTelemetryForSink(&metrics.BlackholeSink{})
 }
 
 func MustNullTelemetry() *Telemetry {
@@ -49,26 +48,16 @@ func NewTelemetry(socket string) (*Telemetry, error) {
 }
 
 func NewTelemetryForSink(sink metrics.MetricSink) (*Telemetry, error) {
-	hostname, err := os.Hostname()
-	if err != nil {
-		hostname = ""
-	}
-
-	return NewTelemetryForSinkAndHostname(sink, hostname)
-}
-
-func NewTelemetryForSinkAndHostname(sink metrics.MetricSink, hostname string) (*Telemetry, error) {
 	_metrics, err := metrics.New(metrics.DefaultConfig(serviceName), sink)
 	if err != nil {
 		return nil, err
 	}
 	_metrics.EnableHostname = false
+	_metrics.EnableHostnameLabel = true
+	_metrics.EnableServiceLabel = true
 
 	telemetry := Telemetry{
 		Metrics: _metrics,
-	}
-	if len(hostname) > 0 {
-		telemetry.AddLabel("hostname", hostname)
 	}
 
 	return &telemetry, nil
