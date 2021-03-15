@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/square/spiffe-aws-assume-role/internal/mocks"
 	"github.com/square/spiffe-aws-assume-role/internal/test"
+	"github.com/square/spiffe-aws-assume-role/pkg/telemetry"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -31,6 +32,7 @@ func TestPassesSessionDurationToStsAssumeRole(t *testing.T) {
 	provider := Provider{
 		SessionDuration: sessionDuration,
 		stsClient:       &stsClient,
+		telemetry:       telemetry.MustNullTelemetry(),
 	}
 	_, err := provider.assumeRole(context.Background(), "role")
 	require.NoError(t, err)
@@ -50,7 +52,8 @@ func TestNewProviderAssignsSessionDuration(t *testing.T) {
 		roleArn,
 		jwtSource,
 		nonZeroSessionDuration,
-		nil)
+		nil,
+		telemetry.MustNullTelemetry())
 	require.NoError(t, err)
 	require.Equal(t, nonZeroSessionDuration, provider.SessionDuration)
 }
@@ -90,7 +93,8 @@ func TestRetrieveSetsExpirationOnCredentials(t *testing.T) {
 		roleArn,
 		&jwtSource,
 		sessionDuration,
-		&stsClient)
+		&stsClient,
+		telemetry.MustNullTelemetry())
 	require.NoError(t, err)
 
 	_, err = provider.Retrieve()
@@ -120,6 +124,7 @@ func TestAssumeRoleAppendsPolicies(t *testing.T) {
 		Policy:     policy,
 		PolicyARNs: []string{policyArn1, policyArn2},
 		stsClient:  &stsClient,
+		telemetry:  telemetry.MustNullTelemetry(),
 	}
 	_, err := provider.assumeRole(context.Background(), "role")
 	require.NoError(t, err)

@@ -51,6 +51,12 @@ func TestErrorLogging(t *testing.T) {
 	require.True(t, strings.Contains(logs, badSpiffeId))
 }
 
+func TestParsesTelemetrySocket(t *testing.T) {
+	telemetrySocket := "127.0.0.1:8200"
+	command := parseTest(t, fmt.Sprintf("--telemetry-socket=%s", telemetrySocket))
+	require.EqualValues(t, telemetrySocket, command.TelemetrySocket)
+}
+
 func TestParsesSessionDuration(t *testing.T) {
 	command := parseTest(t, "--session-duration=PT5M")
 	require.EqualValues(t, 5, command.SessionDuration.Minutes())

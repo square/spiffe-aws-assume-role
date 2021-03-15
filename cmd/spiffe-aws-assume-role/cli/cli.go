@@ -15,6 +15,7 @@ import (
 	"github.com/square/spiffe-aws-assume-role/cmd/spiffe-aws-assume-role/cli/mappers"
 	"github.com/square/spiffe-aws-assume-role/pkg/credentials"
 	"github.com/square/spiffe-aws-assume-role/pkg/processcreds"
+	"github.com/square/spiffe-aws-assume-role/pkg/telemetry"
 )
 
 type CredentialsCmd struct {
@@ -27,23 +28,31 @@ type CredentialsCmd struct {
 	STSRegion       string        `optional:"" help:"AWS STS Region"`
 	SessionDuration time.Duration `optional:"" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
 	LogFilePath     string        `optional:"" help:"Path to log file"`
+	TelemetrySocket string        `optional:"" help:"Socket address (TCP/UNIX) to emit metrics to (e.g. 127.0.0.1:8200)"`
 }
 
 type CliContext struct {
 	JWTSourceProvider credentials.JWTSourceProvider
 	STSProvider       credentials.STSProvider
 	Logger            *logrus.Logger
+	Telemetry         *telemetry.Telemetry
 }
 
 func (c *CredentialsCmd) Run(context *CliContext) error {
 	c.configureLogger(context.Logger)
+
+	telemetry, err := c.configureTelemetry()
+	if err != nil {
+		return errors.Wrap(err, fmt.Sprintf("failed to configure telemetry for socket address %s", c.TelemetrySocket))
+	}
+	context.Telemetry = telemetry
 
 	spiffeID, err := spiffeid.FromString(c.SpiffeID)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to parse SPIFFE ID from %s", c.SpiffeID))
 	}
 
-	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience, context.Logger)
+	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience, context.Logger, telemetry)
 
 	session := createSession(c.STSEndpoint, c.STSRegion)
 	stsClient := context.STSProvider(session)
@@ -53,7 +62,8 @@ func (c *CredentialsCmd) Run(context *CliContext) error {
 		c.RoleARN,
 		src,
 		c.SessionDuration,
-		stsClient)
+		stsClient,
+		telemetry)
 	if err != nil {
 		return errors.Wrap(err, "failed to instantiate credentials provider")
 	}
@@ -78,6 +88,14 @@ func (c *CredentialsCmd) configureLogger(logger *logrus.Logger) {
 	}
 }
 
+func (c *CredentialsCmd) configureTelemetry() (t *telemetry.Telemetry, err error) {
+	t, err = telemetry.NewTelemetry(c.TelemetrySocket)
+	if err != nil && len(c.STSRegion) > 0 {
+		t.AddLabel("stsRegion", c.STSRegion)
+	}
+	return
+}
+
 type CLI struct {
 	Credentials CredentialsCmd `kong:"cmd,help:'print credentials in a format usable as an AWS credentials_process'"`
 }
@@ -88,10 +106,16 @@ func RunWithDefaultContext(args []string) error {
 	// time="2021-03-01T16:28:51-08:00" level=error msg="failed to parse SPIFFE ID from 305d07ed-765e-4642-9bd3-4c74aa86f5ed: spiffeid: invalid scheme"
 	logger.SetFormatter(&logrus.TextFormatter{})
 
+	telemetry, err := telemetry.NullTelemetry()
+	if err != nil {
+		return err
+	}
+
 	context := &CliContext{
 		JWTSourceProvider: credentials.StandardJWTSourceProvider,
 		STSProvider:       credentials.StandardSTSProvider,
 		Logger:            logger,
+		Telemetry:         telemetry,
 	}
 
 	return Run(context, args)

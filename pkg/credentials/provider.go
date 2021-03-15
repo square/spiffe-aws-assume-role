@@ -10,6 +10,7 @@ import (
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
 	"github.com/pkg/errors"
+	"github.com/square/spiffe-aws-assume-role/pkg/telemetry"
 )
 
 func NewProvider(
@@ -17,7 +18,8 @@ func NewProvider(
 	roleARN string,
 	jwtSource JWTSource,
 	sessionDuration time.Duration,
-	stsClient stsiface.STSAPI) (*Provider, error) {
+	stsClient stsiface.STSAPI,
+	telemetry *telemetry.Telemetry) (*Provider, error) {
 
 	cfg := Provider{
 		Expiry:          credentials.Expiry{},
@@ -27,6 +29,7 @@ func NewProvider(
 		RenewWindow:     time.Minute, // Default to 1 minute pre-renew. This avoids in-flight requests expiring.
 		jwtSource:       jwtSource,
 		SessionDuration: sessionDuration,
+		telemetry:       telemetry,
 	}
 
 	return &cfg, nil
@@ -47,6 +50,8 @@ type Provider struct {
 
 	SessionDuration time.Duration
 	RenewWindow     time.Duration
+
+	telemetry *telemetry.Telemetry
 }
 
 // SpiffeProvider implements the AWS credentials Provider interface
@@ -76,7 +81,10 @@ func (sp *Provider) Retrieve() (credentials.Value, error) {
 	}, nil
 }
 
-func (sp *Provider) assumeRole(ctx context.Context, token string) (*sts.AssumeRoleWithWebIdentityOutput, error) {
+func (sp *Provider) assumeRole(ctx context.Context, token string) (output *sts.AssumeRoleWithWebIdentityOutput, err error) {
+	emitMetrics := sp.telemetry.Instrument([]string{"Provider", "assumeRole"}, &err)
+	defer emitMetrics()
+
 	assumeReq := sts.AssumeRoleWithWebIdentityInput{
 		RoleArn:          &sp.RoleARN,
 		RoleSessionName:  &sp.SessionName,
