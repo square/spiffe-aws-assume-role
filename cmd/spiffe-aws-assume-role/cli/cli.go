@@ -38,21 +38,25 @@ type CliContext struct {
 	Telemetry         *telemetry.Telemetry
 }
 
-func (c *CredentialsCmd) Run(context *CliContext) error {
+func (c *CredentialsCmd) Run(context *CliContext) (err error) {
 	c.configureLogger(context.Logger)
 
-	telemetry, err := c.configureTelemetry()
+	t, err := c.configureTelemetry()
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to configure telemetry for socket address %s", c.TelemetrySocket))
 	}
-	context.Telemetry = telemetry
+	defer t.Close()
+	context.Telemetry = t
+
+	emitMetrics := t.Instrument([]string{"Cli", "Run"}, &err)
+	defer emitMetrics()
 
 	spiffeID, err := spiffeid.FromString(c.SpiffeID)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to parse SPIFFE ID from %s", c.SpiffeID))
 	}
 
-	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience, context.Logger, telemetry)
+	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience, context.Logger, t)
 
 	session := createSession(c.STSEndpoint, c.STSRegion)
 	stsClient := context.STSProvider(session)
@@ -63,7 +67,7 @@ func (c *CredentialsCmd) Run(context *CliContext) error {
 		src,
 		c.SessionDuration,
 		stsClient,
-		telemetry)
+		t)
 	if err != nil {
 		return errors.Wrap(err, "failed to instantiate credentials provider")
 	}

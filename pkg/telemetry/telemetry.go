@@ -4,7 +4,6 @@ import (
 	"time"
 
 	metrics "github.com/armon/go-metrics"
-	"github.com/armon/go-metrics/datadog"
 )
 
 const (
@@ -18,9 +17,12 @@ const (
 )
 
 type Telemetry struct {
+	sink    CloseableMetricSink
 	Metrics *metrics.Metrics
 	labels  []metrics.Label
 }
+
+var _ Closeable = (*Telemetry)(nil)
 
 func (t *Telemetry) AddLabel(name string, value string) {
 	t.labels = append(t.labels, metrics.Label{Name: name, Value: value})
@@ -44,10 +46,10 @@ func NewTelemetry(socket string) (*Telemetry, error) {
 		return nil, err
 	}
 
-	return NewTelemetryForSink(sink)
+	return NewTelemetryForCloseableSink(sink)
 }
 
-func NewTelemetryForSink(sink metrics.MetricSink) (*Telemetry, error) {
+func NewTelemetryForCloseableSink(sink CloseableMetricSink) (*Telemetry, error) {
 	_metrics, err := metrics.New(metrics.DefaultConfig(serviceName), sink)
 	if err != nil {
 		return nil, err
@@ -57,18 +59,27 @@ func NewTelemetryForSink(sink metrics.MetricSink) (*Telemetry, error) {
 	_metrics.EnableServiceLabel = true
 
 	telemetry := Telemetry{
+		sink:    sink,
 		Metrics: _metrics,
 	}
 
 	return &telemetry, nil
 }
 
-func newSink(socket string) (metrics.MetricSink, error) {
+func NewTelemetryForSink(sink metrics.MetricSink) (*Telemetry, error) {
+	return NewTelemetryForCloseableSink(NewCloseableMetricSinkAdapter(sink))
+}
+
+func newSink(socket string) (CloseableMetricSink, error) {
 	if socket == "" {
-		return &metrics.BlackholeSink{}, nil
+		return NewCloseableMetricSinkAdapter(&metrics.BlackholeSink{}), nil
 	} else {
-		return datadog.NewDogStatsdSink(socket, noHostName)
+		return NewCloseableDogStatsdSink(socket, noHostName)
 	}
+}
+
+func (t *Telemetry) Close() {
+	t.sink.Close()
 }
 
 func (t *Telemetry) Instrument(baseMetricName []string, err *error) func() {
