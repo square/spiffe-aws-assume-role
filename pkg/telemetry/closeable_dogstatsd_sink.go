@@ -32,7 +32,7 @@ func NewCloseableDogStatsdSink(addr string, hostName string) (*CloseableDogStats
 }
 
 func (s *CloseableDogStatsdSink) Close() {
-	s.client.Close()
+	_ = s.client.Close()
 }
 
 func (s *CloseableDogStatsdSink) SetTags(tags []string) {
@@ -75,7 +75,10 @@ func (s *CloseableDogStatsdSink) parseKey(key []string) ([]string, []metrics.Lab
 	}
 
 	if s.propagateHostname {
-		labels = append(labels, metrics.Label{"host", hostName})
+		labels = append(labels, metrics.Label{
+			Name:  "host",
+			Value: hostName,
+		})
 	}
 	return key, labels
 }
@@ -97,19 +100,19 @@ func (s *CloseableDogStatsdSink) AddSample(key []string, val float32) {
 func (s *CloseableDogStatsdSink) SetGaugeWithLabels(key []string, val float32, labels []metrics.Label) {
 	flatKey, tags := s.getFlatkeyAndCombinedLabels(key, labels)
 	rate := 1.0
-	s.client.Gauge(flatKey, float64(val), tags, rate)
+	_ = s.client.Gauge(flatKey, float64(val), tags, rate)
 }
 
 func (s *CloseableDogStatsdSink) IncrCounterWithLabels(key []string, val float32, labels []metrics.Label) {
 	flatKey, tags := s.getFlatkeyAndCombinedLabels(key, labels)
 	rate := 1.0
-	s.client.Count(flatKey, int64(val), tags, rate)
+	_ = s.client.Count(flatKey, int64(val), tags, rate)
 }
 
 func (s *CloseableDogStatsdSink) AddSampleWithLabels(key []string, val float32, labels []metrics.Label) {
 	flatKey, tags := s.getFlatkeyAndCombinedLabels(key, labels)
 	rate := 1.0
-	s.client.TimeInMilliseconds(flatKey, float64(val), tags, rate)
+	_ = s.client.TimeInMilliseconds(flatKey, float64(val), tags, rate)
 }
 
 func (s *CloseableDogStatsdSink) getFlatkeyAndCombinedLabels(key []string, labels []metrics.Label) (string, []string) {
