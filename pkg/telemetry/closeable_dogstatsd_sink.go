@@ -27,8 +27,8 @@ func NewCloseableDogStatsdSink(addr string, hostName string) (*CloseableDogStats
 }
 
 func (s *CloseableDogStatsdSink) Close() {
-	structType := reflect.ValueOf(s.DogStatsdSink).Elem()
-	privateField := structType.FieldByName("client")
+	structValue := reflect.ValueOf(s.DogStatsdSink).Elem()
+	privateField := structValue.FieldByName("client")
 	fieldValue := reflect.NewAt(privateField.Type(), unsafe.Pointer(privateField.UnsafeAddr())).Elem()
 	statsdClient := fieldValue.Interface().(*statsd.Client)
 	_ = statsdClient.Close()
