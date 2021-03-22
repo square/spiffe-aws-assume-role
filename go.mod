@@ -3,6 +3,7 @@ module github.com/square/spiffe-aws-assume-role
 go 1.14
 
 require (
+	github.com/DataDog/datadog-go v3.2.0+incompatible
 	github.com/alecthomas/kong v0.2.9
 	github.com/armon/go-metrics v0.3.6
 	github.com/aws/aws-sdk-go v1.37.1
