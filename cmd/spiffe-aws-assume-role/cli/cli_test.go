@@ -77,7 +77,7 @@ func TestParsesLogFilePath(t *testing.T) {
 func parseTest(t *testing.T, arg string) CredentialsCmd {
 	args := append(requiredArgs, arg)
 
-	context, err := parse(args)
+	context, err := Parse(args)
 	require.NoError(t, err)
 
 	cli := context.Model.Target.Interface().(CLI)
@@ -95,7 +95,7 @@ func TestParsesStsRegion(t *testing.T) {
 		"--role-arn=bar",
 		"--spiffe-id=baz",
 	}
-	context, err := parse(args)
+	context, err := Parse(args)
 	require.NoError(t, err)
 
 	cli := context.Model.Target.Interface().(CLI)
