@@ -6,6 +6,8 @@ import (
 	"os"
 	"time"
 
+	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
@@ -87,4 +89,18 @@ func (c *CredentialsCmd) configureTelemetry() (t *telemetry.Telemetry, err error
 		t.AddLabel("stsRegion", c.STSRegion)
 	}
 	return
+}
+
+func createSession(stsEndpoint string, stsRegion string) *session.Session {
+	config := &aws.Config{}
+
+	if len(stsEndpoint) > 0 {
+		config.Endpoint = aws.String(stsEndpoint)
+	}
+
+	if len(stsRegion) > 0 {
+		config.Region = aws.String(stsRegion)
+	}
+
+	return session.Must(session.NewSession(config))
 }
