@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/square/spiffe-aws-assume-role/internal/mocks"
 	"github.com/square/spiffe-aws-assume-role/internal/test"
@@ -14,6 +15,79 @@ import (
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
+
+func TestAssumeRoleFailsAfterThreeInvalidTokenExceptions(t *testing.T) {
+	stsClient := mocks.STSAPI{}
+	defer stsClient.AssertExpectations(t)
+
+	invalidTokenException := awserr.New(sts.ErrCodeInvalidIdentityTokenException, "message", nil)
+	stsClient.
+		On("AssumeRoleWithWebIdentityWithContext", mock.Anything, mock.Anything).
+		Return(nil, invalidTokenException).
+		Times(3)
+
+	provider := Provider{
+		stsClient: &stsClient,
+		telemetry: telemetry.MustNullTelemetry(),
+	}
+	_, err := provider.assumeRole(context.Background(), "token")
+	require.Error(t, err)
+}
+
+func TestAssumeRoleSucceedsAfterTwoInvalidTokenExceptions(t *testing.T) {
+	stsClient := mocks.STSAPI{}
+	defer stsClient.AssertExpectations(t)
+
+	invalidTokenException := awserr.New(sts.ErrCodeInvalidIdentityTokenException, "message", nil)
+	stsClient.
+		On("AssumeRoleWithWebIdentityWithContext", mock.Anything, mock.Anything).
+		Return(nil, invalidTokenException).
+		Times(2)
+
+	output := &sts.AssumeRoleWithWebIdentityOutput{}
+	stsClient.
+		On("AssumeRoleWithWebIdentityWithContext", mock.Anything, mock.Anything).
+		Return(output, nil).
+		Times(1)
+
+	provider := Provider{
+		stsClient: &stsClient,
+		telemetry: telemetry.MustNullTelemetry(),
+	}
+	_, err := provider.assumeRole(context.Background(), "token")
+	require.NoError(t, err)
+}
+
+func TestDetectsInvalidIdentityTokenException(t *testing.T) {
+	invalidTokenException := awserr.New(sts.ErrCodeInvalidIdentityTokenException, "message", nil)
+	require.True(t, hasErrorCode(invalidTokenException, sts.ErrCodeInvalidIdentityTokenException))
+}
+
+func TestHasErrorCodeNilError(t *testing.T) {
+	require.False(t, hasErrorCode(nil, sts.ErrCodeInvalidIdentityTokenException))
+}
+
+type MyError struct {
+}
+
+func (*MyError) Error() string {
+	return "MyError"
+}
+
+func TestHasErrorCodeNonAwsError(t *testing.T) {
+	nonAwsError := &MyError{}
+	require.False(t, hasErrorCode(nonAwsError, sts.ErrCodeInvalidIdentityTokenException))
+}
+
+func TestHasErrorCodeWrongErrorCode(t *testing.T) {
+	awsError := awserr.New("foo", "bar", nil)
+	require.False(t, hasErrorCode(awsError, sts.ErrCodeInvalidIdentityTokenException))
+}
+
+func TestHasErrorCodeCorrectErrorCode(t *testing.T) {
+	awsError := awserr.New(sts.ErrCodeInvalidIdentityTokenException, "message", nil)
+	require.True(t, hasErrorCode(awsError, sts.ErrCodeInvalidIdentityTokenException))
+}
 
 func TestPassesSessionDurationToStsAssumeRole(t *testing.T) {
 	stsClient := mocks.STSAPI{}
