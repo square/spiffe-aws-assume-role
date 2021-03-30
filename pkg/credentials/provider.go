@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
+	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 	"github.com/aws/aws-sdk-go/service/sts"
 	"github.com/aws/aws-sdk-go/service/sts/stsiface"
@@ -85,6 +86,21 @@ func (sp *Provider) assumeRole(ctx context.Context, token string) (output *sts.A
 	emitMetrics := sp.telemetry.Instrument([]string{"Provider", "assumeRole"}, &err)
 	defer emitMetrics()
 
+	assumeReq := sp.newAssumeRoleRequest(token)
+
+	for attempts := 0; attempts < 3; attempts++ {
+		output, err = sp.stsClient.AssumeRoleWithWebIdentityWithContext(ctx, assumeReq)
+		if hasErrorCode(err, sts.ErrCodeInvalidIdentityTokenException) {
+			continue
+		}
+
+		break
+	}
+
+	return output, err
+}
+
+func (sp *Provider) newAssumeRoleRequest(token string) *sts.AssumeRoleWithWebIdentityInput {
 	assumeReq := sts.AssumeRoleWithWebIdentityInput{
 		RoleArn:          &sp.RoleARN,
 		RoleSessionName:  &sp.SessionName,
@@ -107,5 +123,18 @@ func (sp *Provider) assumeRole(ctx context.Context, token string) (output *sts.A
 		assumeReq.PolicyArns = append(assumeReq.PolicyArns, &sts.PolicyDescriptorType{Arn: aws.String(arn)})
 	}
 
-	return sp.stsClient.AssumeRoleWithWebIdentityWithContext(ctx, &assumeReq)
+	return &assumeReq
+}
+
+func hasErrorCode(err error, errorCode string) bool {
+	if err == nil {
+		return false
+	}
+
+	awsErr, ok := err.(awserr.Error)
+	if !ok {
+		return false
+	}
+
+	return awsErr.Code() == errorCode
 }
