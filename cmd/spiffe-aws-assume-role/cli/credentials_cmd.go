@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 	"io"
+	"net/http"
 	"os"
 	"time"
 
@@ -100,6 +101,12 @@ func createSession(stsEndpoint string, stsRegion string) *session.Session {
 
 	if len(stsRegion) > 0 {
 		config.Region = aws.String(stsRegion)
+	}
+
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	config.HTTPClient = &http.Client{
+		Transport: transport,
 	}
 
 	return session.Must(session.NewSession(config))
