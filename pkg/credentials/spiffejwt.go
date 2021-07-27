@@ -4,8 +4,9 @@ import (
 	"context"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/pkg/errors"
-	"github.com/spiffe/go-spiffe/v2/logger"
 	"github.com/spiffe/go-spiffe/v2/spiffeid"
 	"github.com/spiffe/go-spiffe/v2/svid/jwtsvid"
 	"github.com/spiffe/go-spiffe/v2/workloadapi"
@@ -23,7 +24,7 @@ type JWTSVIDSource struct {
 	subject        spiffeid.ID
 	audience       string
 	workloadSocket string
-	logger         logger.Logger
+	logger         *logrus.Logger
 	telemetry      *telemetry.Telemetry
 }
 
@@ -31,7 +32,7 @@ func NewJWTSVIDSource(
 	subject spiffeid.ID,
 	workloadSocket string,
 	audience string,
-	logger logger.Logger,
+	logger *logrus.Logger,
 	telemetry *telemetry.Telemetry) *JWTSVIDSource {
 
 	return &JWTSVIDSource{
@@ -59,18 +60,22 @@ func (jss *JWTSVIDSource) FetchToken(ctx context.Context) (token string, err err
 	ctx, cancel := context.WithTimeout(ctx, workloadConnTimeout)
 	defer cancel()
 
+	jss.logger.Debug("Opening SPIRE agent socket")
 	jwtSource, err := workloadapi.NewJWTSource(ctx, dialOpts...)
 	if err != nil {
 		return "", errors.Wrap(err, "creating JWT-SVID source")
 	}
 
-	jwt, err := jwtSource.FetchJWTSVID(ctx, jwtsvid.Params{
+	params := jwtsvid.Params{
 		Audience: jss.audience,
 		Subject:  jss.subject,
-	})
+	}
+	jss.logger.Debugf("Fetching JWT SVID: %v", params)
+	jwt, err := jwtSource.FetchJWTSVID(ctx, params)
 	if err != nil {
 		return "", errors.Wrap(err, "retrieving JWT-SVID")
 	}
+	jss.logger.Debug("Successfully fetched JWT SVID")
 
 	return jwt.Marshal(), nil
 }

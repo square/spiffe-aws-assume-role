@@ -5,6 +5,8 @@ import (
 	"fmt"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/aws/credentials"
@@ -20,7 +22,9 @@ func NewProvider(
 	jwtSource JWTSource,
 	sessionDuration time.Duration,
 	stsClient stsiface.STSAPI,
-	telemetry *telemetry.Telemetry) (*Provider, error) {
+	telemetry *telemetry.Telemetry,
+	logger *logrus.Logger,
+) (*Provider, error) {
 
 	cfg := Provider{
 		Expiry:          credentials.Expiry{},
@@ -31,6 +35,7 @@ func NewProvider(
 		jwtSource:       jwtSource,
 		SessionDuration: sessionDuration,
 		telemetry:       telemetry,
+		logger:          logger,
 	}
 
 	return &cfg, nil
@@ -53,6 +58,7 @@ type Provider struct {
 	RenewWindow     time.Duration
 
 	telemetry *telemetry.Telemetry
+	logger    *logrus.Logger
 }
 
 // SpiffeProvider implements the AWS credentials Provider interface
@@ -87,8 +93,10 @@ func (sp *Provider) assumeRole(ctx context.Context, token string) (output *sts.A
 	defer emitMetrics()
 
 	assumeReq := sp.newAssumeRoleRequest(token)
+	sp.logger.Debugf("AssumeRole Request %v", assumeReq)
 
 	for attempts := 0; attempts < 3; attempts++ {
+		sp.logger.Debugf("AssumeRole Attempt %d", attempts)
 		output, err = sp.stsClient.AssumeRoleWithWebIdentityWithContext(ctx, assumeReq)
 		if hasErrorCode(err, sts.ErrCodeInvalidIdentityTokenException) {
 			continue
@@ -96,6 +104,8 @@ func (sp *Provider) assumeRole(ctx context.Context, token string) (output *sts.A
 
 		break
 	}
+
+	sp.logger.Debug("Successful AssumeRole")
 
 	return output, err
 }

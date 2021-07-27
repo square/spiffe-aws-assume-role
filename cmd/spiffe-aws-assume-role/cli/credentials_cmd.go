@@ -27,6 +27,7 @@ type CredentialsCmd struct {
 	SessionDuration time.Duration `optional:"" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
 	LogFilePath     string        `optional:"" help:"Path to log file"`
 	TelemetrySocket string        `optional:"" help:"Socket address (TCP/UNIX) to emit metrics to (e.g. 127.0.0.1:8200)"`
+	Debug           bool          `optional:"" help:"Enable debug logging"`
 }
 
 func (c *CredentialsCmd) Run(context *CliContext) (err error) {
@@ -58,7 +59,8 @@ func (c *CredentialsCmd) Run(context *CliContext) (err error) {
 		src,
 		c.SessionDuration,
 		stsClient,
-		t)
+		t,
+		context.Logger)
 	if err != nil {
 		return errors.Wrap(err, "failed to instantiate credentials provider")
 	}
@@ -80,6 +82,9 @@ func (c *CredentialsCmd) configureLogger(logger *logrus.Logger) {
 		} else {
 			logger.Out = io.MultiWriter(os.Stderr, file)
 		}
+	}
+	if c.Debug {
+		logger.Level = logrus.DebugLevel
 	}
 }
 

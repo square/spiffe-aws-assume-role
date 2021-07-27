@@ -6,6 +6,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/awserr"
 	"github.com/aws/aws-sdk-go/service/sts"
@@ -29,6 +31,7 @@ func TestAssumeRoleFailsAfterThreeInvalidTokenExceptions(t *testing.T) {
 	provider := Provider{
 		stsClient: &stsClient,
 		telemetry: telemetry.MustNullTelemetry(),
+		logger:    logrus.New(),
 	}
 	_, err := provider.assumeRole(context.Background(), "token")
 	require.Error(t, err)
@@ -53,6 +56,7 @@ func TestAssumeRoleSucceedsAfterTwoInvalidTokenExceptions(t *testing.T) {
 	provider := Provider{
 		stsClient: &stsClient,
 		telemetry: telemetry.MustNullTelemetry(),
+		logger:    logrus.New(),
 	}
 	_, err := provider.assumeRole(context.Background(), "token")
 	require.NoError(t, err)
@@ -107,6 +111,7 @@ func TestPassesSessionDurationToStsAssumeRole(t *testing.T) {
 		SessionDuration: sessionDuration,
 		stsClient:       &stsClient,
 		telemetry:       telemetry.MustNullTelemetry(),
+		logger:          logrus.New(),
 	}
 	_, err := provider.assumeRole(context.Background(), "role")
 	require.NoError(t, err)
@@ -127,7 +132,8 @@ func TestNewProviderAssignsSessionDuration(t *testing.T) {
 		jwtSource,
 		nonZeroSessionDuration,
 		nil,
-		telemetry.MustNullTelemetry())
+		telemetry.MustNullTelemetry(),
+		logrus.New())
 	require.NoError(t, err)
 	require.Equal(t, nonZeroSessionDuration, provider.SessionDuration)
 }
@@ -168,7 +174,8 @@ func TestRetrieveSetsExpirationOnCredentials(t *testing.T) {
 		&jwtSource,
 		sessionDuration,
 		&stsClient,
-		telemetry.MustNullTelemetry())
+		telemetry.MustNullTelemetry(),
+		logrus.New())
 	require.NoError(t, err)
 
 	_, err = provider.Retrieve()
@@ -199,6 +206,7 @@ func TestAssumeRoleAppendsPolicies(t *testing.T) {
 		PolicyARNs: []string{policyArn1, policyArn2},
 		stsClient:  &stsClient,
 		telemetry:  telemetry.MustNullTelemetry(),
+		logger:     logrus.New(),
 	}
 	_, err := provider.assumeRole(context.Background(), "role")
 	require.NoError(t, err)

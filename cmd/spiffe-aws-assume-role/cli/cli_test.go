@@ -8,6 +8,8 @@ import (
 	"testing"
 	"time"
 
+	"github.com/sirupsen/logrus"
+
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
@@ -166,6 +168,7 @@ func TestSetsCustomSessionDuration(t *testing.T) {
 	context := CliContext{
 		JWTSourceProvider: credentials.StaticJWTSourceProvider(&jwtSource),
 		STSProvider:       credentials.StaticSTSProvider(&stsClient),
+		Logger:            logrus.New(),
 	}
 
 	failOnError(t, Run(&context, args))
@@ -219,6 +222,7 @@ func TestSetsCustomStsEndpoint(t *testing.T) {
 	context := CliContext{
 		JWTSourceProvider: credentials.StaticJWTSourceProvider(&jwtSource),
 		STSProvider:       stsProvider,
+		Logger:            logrus.New(),
 	}
 
 	failOnError(t, Run(&context, args))
@@ -271,6 +275,7 @@ func TestSetsCustomStsRegion(t *testing.T) {
 	context := CliContext{
 		JWTSourceProvider: credentials.StaticJWTSourceProvider(&jwtSource),
 		STSProvider:       stsProvider,
+		Logger:            logrus.New(),
 	}
 
 	failOnError(t, Run(&context, args))
