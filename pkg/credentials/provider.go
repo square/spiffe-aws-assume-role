@@ -20,6 +20,7 @@ func NewProvider(
 	audience string,
 	roleARN string,
 	jwtSource JWTSource,
+	sessionName string,
 	sessionDuration time.Duration,
 	stsClient stsiface.STSAPI,
 	telemetry *telemetry.Telemetry,
@@ -34,6 +35,7 @@ func NewProvider(
 		RenewWindow:     time.Minute, // Default to 1 minute pre-renew. This avoids in-flight requests expiring.
 		jwtSource:       jwtSource,
 		SessionDuration: sessionDuration,
+		SessionName:     sessionName,
 		telemetry:       telemetry,
 		logger:          logger,
 	}

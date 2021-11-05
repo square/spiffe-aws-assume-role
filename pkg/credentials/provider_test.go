@@ -122,6 +122,7 @@ func TestPassesSessionDurationToStsAssumeRole(t *testing.T) {
 
 func TestNewProviderAssignsSessionDuration(t *testing.T) {
 	nonZeroSessionDuration := time.Duration(randomInt32(1023) + 1)
+	sessionName := "testSession"
 
 	var audience, roleArn string
 	var jwtSource JWTSource
@@ -130,6 +131,7 @@ func TestNewProviderAssignsSessionDuration(t *testing.T) {
 		audience,
 		roleArn,
 		jwtSource,
+		sessionName,
 		nonZeroSessionDuration,
 		nil,
 		telemetry.MustNullTelemetry(),
@@ -168,10 +170,13 @@ func TestRetrieveSetsExpirationOnCredentials(t *testing.T) {
 		On("AssumeRoleWithWebIdentityWithContext", mock.Anything, mock.Anything).
 		Return(&assumeRoleResponse, nil)
 
+	sessionName := "testSession"
+
 	provider, err := NewProvider(
 		audience,
 		roleArn,
 		&jwtSource,
+		sessionName,
 		sessionDuration,
 		&stsClient,
 		telemetry.MustNullTelemetry(),

@@ -57,6 +57,7 @@ func (c *CredentialsCmd) Run(context *CliContext) (err error) {
 		c.Audience,
 		c.RoleARN,
 		src,
+		c.SessionName,
 		c.SessionDuration,
 		stsClient,
 		t,
