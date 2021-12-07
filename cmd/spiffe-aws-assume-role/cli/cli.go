@@ -22,18 +22,15 @@ func RunWithDefaultContext(args []string) error {
 }
 
 func Run(context *CliContext, args []string) (err error) {
-	defer func() {
-		if err != nil {
-			context.Logger.Error(err)
-		}
-	}()
-
 	ctx, err := Parse(args)
 	if err != nil {
+		context.Logger.Error(err)
 		return errors.Wrap(err, fmt.Sprintf("failed to parse command line arguments: %s", args))
 	}
 
-	err = ctx.Run(context)
+	if err = ctx.Run(context); err != nil {
+		context.Logger.Error(err)
+	}
 
 	return err
 }
