@@ -28,7 +28,7 @@ type CredentialsCmd struct {
 	SessionDuration time.Duration `optional:"" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
 	LogFilePath     string        `optional:"" help:"Path to log file"`
 	TelemetrySocket string        `optional:"" help:"Socket address (TCP/UNIX) to emit metrics to (e.g. 127.0.0.1:8200)"`
-	SentryDSN       string        `optional:"" help:"DSN from Sentry for sending errors"`
+	SentryDSN       string        `optional:"" help:"DSN from Sentry for sending errors (e.g.  https://<hash>@o123456.ingest.sentry.io/123456"`
 	Debug           bool          `optional:"" help:"Enable debug logging"`
 }
 
