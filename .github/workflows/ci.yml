@@ -13,10 +13,9 @@ jobs:
         uses: actions/checkout@v2
 
       - name: Lint code
-        uses: golangci/golangci-lint-action@e4e910b0cea5459cf5f459ac51f61ebb51934e36
+        uses: golangci/golangci-lint-action@v2
         with:
-          version: v1.36.0
-          skip-go-installation: true
+          version: v1.29
 
       - name: Download dependencies
         run: go mod download
