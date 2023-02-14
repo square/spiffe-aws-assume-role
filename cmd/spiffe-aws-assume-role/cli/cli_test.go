@@ -2,7 +2,6 @@ package cli
 
 import (
 	"fmt"
-	"io/ioutil"
 	"os"
 	"strings"
 	"testing"
@@ -47,7 +46,7 @@ func TestErrorLogging(t *testing.T) {
 	err := RunWithDefaultContext(args)
 	require.Error(t, err)
 
-	bytes, err := ioutil.ReadFile(logFileName)
+	bytes, err := os.ReadFile(logFileName)
 	require.NoError(t, err)
 	logs := string(bytes)
 	require.True(t, strings.Contains(logs, badSpiffeId))
