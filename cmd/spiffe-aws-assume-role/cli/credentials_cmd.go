@@ -42,7 +42,10 @@ func (c *CredentialsCmd) Run(context *CliContext) (err error) {
 	}
 	defer t.Close()
 	context.Telemetry = t
+	return c.RunJWT(context, t)
+}
 
+func (c *CredentialsCmd) RunJWT(context *CliContext, t *telemetry.Telemetry) (err error) {
 	emitMetrics := t.Instrument([]string{"Cli", "Run"}, &err)
 	defer emitMetrics()
 

@@ -1,12 +1,13 @@
 module github.com/square/spiffe-aws-assume-role
 
-go 1.18
+go 1.19
 
 require (
 	github.com/DataDog/datadog-go v4.8.3+incompatible
 	github.com/alecthomas/kong v0.6.1
 	github.com/armon/go-metrics v0.4.0
 	github.com/aws/aws-sdk-go v1.44.61
+	github.com/aws/rolesanywhere-credential-helper v1.0.4
 	github.com/channelmeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
 	github.com/evalphobia/logrus_sentry v0.8.2
 	github.com/google/uuid v1.3.0
