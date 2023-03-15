@@ -31,6 +31,7 @@ type RolesAnywhereCmd struct {
 	ProfileARN      string        `required:"" group:"AWS Config" help:"AWS Profile ARN to use for RolesAnywhere"`
 	PrivateKey      string        `required:"" group:"AWS Config" help:"Private key for X.509 Certificate"`
 	Certificate     string        `required:"" group:"AWS Config" help:"Certificate to be used with RolesAnywhere"`
+	Endpoint        string        `optional:"" group:"AWS Config" help:"Endpoint to use for the RolesAnywhere Request"`
 	SessionDuration time.Duration `optional:"" group:"AWS Config" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
 	Region          string        `optional:"" group:"AWS Config" help:"Trust Anchor region to use"`
 	WithProxy       bool          `optional:""  group:"AWS Config" help:""`
@@ -142,6 +143,9 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 	// Create a new HTTP client with handlers for signing
 	client := &http.Client{Transport: tr}
 	config := aws.NewConfig().WithRegion(c.Region).WithHTTPClient(client).WithLogLevel(logLevel)
+	if c.Endpoint != "" {
+		config.WithEndpoint(c.Endpoint)
+	}
 	rolesAnywhereClient := rolesanywhere.New(mySession, config)
 	rolesAnywhereClient.Handlers.Build.RemoveByName("core.SDKVersionUserAgentHandler")
 	rolesAnywhereClient.Handlers.Build.PushBackNamed(request.NamedHandler{Name: "v4x509.SpiffeAwsAssumeRoleUserAgentHandler", Fn: request.MakeAddToUserAgentHandler("SpiffeAwsAssumeRole", "1", runtime.Version(), runtime.GOOS, runtime.GOARCH)})
