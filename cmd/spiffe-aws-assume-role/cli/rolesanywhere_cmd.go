@@ -217,8 +217,7 @@ func (c *RolesAnywhereCmd) configureLogger(logger *logrus.Logger) {
 }
 
 func (c *RolesAnywhereCmd) configureTelemetry() (t *telemetry.Telemetry, err error) {
-	t, err = telemetry.NewTelemetry(c.TelemetrySocket)
-	return
+	return telemetry.NewTelemetry(c.TelemetrySocket)
 }
 
 func (c *RolesAnywhereCmd) configureSentry(logger *logrus.Logger) {

@@ -97,7 +97,7 @@ func (c *CredentialsCmd) configureTelemetry() (t *telemetry.Telemetry, err error
 	if err != nil && len(c.STSRegion) > 0 {
 		t.AddLabel("stsRegion", c.STSRegion)
 	}
-	return
+	return t, err
 }
 
 func (c *CredentialsCmd) configureSentry(logger *logrus.Logger) {
