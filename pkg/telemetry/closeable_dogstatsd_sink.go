@@ -1,10 +1,6 @@
 package telemetry
 
 import (
-	"reflect"
-	"unsafe"
-
-	"github.com/DataDog/datadog-go/statsd"
 	"github.com/armon/go-metrics/datadog"
 )
 
@@ -27,9 +23,10 @@ func NewCloseableDogStatsdSink(addr string, hostName string) (*CloseableDogStats
 }
 
 func (s *CloseableDogStatsdSink) Close() {
-	structValue := reflect.ValueOf(s.DogStatsdSink).Elem()
-	privateField := structValue.FieldByName("client")
-	fieldValue := reflect.NewAt(privateField.Type(), unsafe.Pointer(privateField.UnsafeAddr())).Elem()
-	statsdClient := fieldValue.Interface().(*statsd.Client)
-	_ = statsdClient.Close()
+	s.DogStatsdSink.Shutdown()
+	// structValue := reflect.ValueOf(s.DogStatsdSink).Elem()
+	// privateField := structValue.FieldByName("client")
+	// fieldValue := reflect.NewAt(privateField.Type(), unsafe.Pointer(privateField.UnsafeAddr())).Elem()
+	// statsdClient := fieldValue.Interface().(*statsd.Client)
+	// _ = statsdClient.Close()
 }
