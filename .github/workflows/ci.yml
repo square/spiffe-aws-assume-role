@@ -4,10 +4,10 @@ jobs:
   job:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Go 1.18
+      - name: Install Go 1.19
         uses: actions/setup-go@v2
         with:
-          go-version: '1.18'
+          go-version: '1.19'
 
       - name: Check out code
         uses: actions/checkout@v2
