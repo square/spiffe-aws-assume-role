@@ -91,7 +91,7 @@ func (sp *Provider) Retrieve() (credentials.Value, error) {
 }
 
 func (sp *Provider) assumeRole(ctx context.Context, token string) (output *sts.AssumeRoleWithWebIdentityOutput, err error) {
-	emitMetrics := sp.telemetry.Instrument([]string{"Provider", "assumeRole"}, &err)
+	emitMetrics := sp.telemetry.Instrument([]string{"Provider", "assumeRole"}, &err, sp.logger)
 	defer emitMetrics()
 
 	assumeReq := sp.newAssumeRoleRequest(token)

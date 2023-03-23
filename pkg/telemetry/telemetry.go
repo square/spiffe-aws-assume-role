@@ -4,6 +4,7 @@ import (
 	"time"
 
 	metrics "github.com/armon/go-metrics"
+	"github.com/sirupsen/logrus"
 )
 
 const (
@@ -82,7 +83,7 @@ func (t *Telemetry) Close() {
 	t.sink.Close()
 }
 
-func (t *Telemetry) Instrument(baseMetricName []string, err *error) func() {
+func (t *Telemetry) Instrument(baseMetricName []string, err *error, logger *logrus.Logger) func() {
 	start := time.Now()
 
 	return func() {
@@ -98,6 +99,8 @@ func (t *Telemetry) Instrument(baseMetricName []string, err *error) func() {
 			t.Metrics.IncrCounterWithLabels(copyAndAppend(baseMetricName, success), 0, t.labels)
 			t.Metrics.IncrCounterWithLabels(copyAndAppend(baseMetricName, failure), 1, t.labels)
 		}
+		logger.Errorf("fired metrics with baseMetricName: %s, latency: %d\n", baseMetricName, latencyInMilliseconds)
+
 	}
 }
 

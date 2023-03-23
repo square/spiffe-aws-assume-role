@@ -22,7 +22,7 @@ func TestInstrumentCalls(t *testing.T) {
 	telemetry, err := NewTelemetryForSink(&metricSink)
 	require.NoError(t, err)
 
-	emitMetrics := telemetry.Instrument([]string{"foo", "bar"}, &err)
+	emitMetrics := telemetry.Instrument([]string{"foo", "bar"}, &err, nil)
 	emitMetrics()
 
 	metricSink.AssertCalled(t, "IncrCounterWithLabels",
@@ -38,7 +38,7 @@ func TestInstrumentLatency(t *testing.T) {
 	telemetry, err := NewTelemetryForSink(&metricSink)
 	require.NoError(t, err)
 
-	emitMetrics := telemetry.Instrument([]string{"foo", "bar"}, &err)
+	emitMetrics := telemetry.Instrument([]string{"foo", "bar"}, &err, nil)
 	time.Sleep(time.Second * 1)
 	emitMetrics()
 
@@ -93,7 +93,7 @@ func TestInstrumentBuiltInLabels(t *testing.T) {
 	telemetry, err := NewTelemetryForSink(&metricSink)
 	require.NoError(t, err)
 
-	telemetry.Instrument(nil, &err)()
+	telemetry.Instrument(nil, &err, nil)()
 
 	hostname, err := os.Hostname()
 	require.NoError(t, err)
@@ -124,7 +124,7 @@ func TestInstrumentCustomLabel(t *testing.T) {
 	labelValue := uuid.New().String()
 	telemetry.AddLabel(labelName, labelValue)
 
-	telemetry.Instrument(nil, &err)()
+	telemetry.Instrument(nil, &err, nil)()
 
 	customLabel := metrics.Label{
 		Name:  labelName,
@@ -152,14 +152,14 @@ func TestInstrumentCustomLabel(t *testing.T) {
 // These next two methods are intended to simulate typical usage patterns
 
 func methodThatSucceeds(t *Telemetry) (err error) {
-	emitMetrics := t.Instrument([]string{"foo", "bar"}, &err)
+	emitMetrics := t.Instrument([]string{"foo", "bar"}, &err, nil)
 	defer emitMetrics()
 
 	return nil
 }
 
 func methodThatFails(t *Telemetry) (err error) {
-	emitMetrics := t.Instrument([]string{"foo", "bar"}, &err)
+	emitMetrics := t.Instrument([]string{"foo", "bar"}, &err, nil)
 	defer emitMetrics()
 
 	return errors.New("bar")

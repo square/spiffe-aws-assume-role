@@ -45,7 +45,7 @@ func NewJWTSVIDSource(
 }
 
 func (jss *JWTSVIDSource) FetchToken(ctx context.Context) (token string, err error) {
-	emitMetrics := jss.telemetry.Instrument([]string{"JWTSVIDSource", "FetchToken"}, &err)
+	emitMetrics := jss.telemetry.Instrument([]string{"JWTSVIDSource", "FetchToken"}, &err, jss.logger)
 	defer emitMetrics()
 
 	var dialOpts []workloadapi.JWTSourceOption
