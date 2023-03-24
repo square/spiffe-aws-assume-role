@@ -59,7 +59,7 @@ func (c *RolesAnywhereCmd) Run(context *CliContext) (err error) {
 // RunRolesAnywhere will assume that the certificate and intermediates are bundled together. Much remains
 // similar between the two functions.
 func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *telemetry.Telemetry) (err error) {
-	emitMetrics := telemetry.Instrument([]string{"cli", "rolesanywhere"}, &err)
+	emitMetrics := telemetry.Instrument([]string{"spiffe_aws_assume_role", "rolesanywhere"}, &err)
 	defer emitMetrics()
 
 	// If a region is not explicitly specified, retrieve it from the Trust Anchor ARN
