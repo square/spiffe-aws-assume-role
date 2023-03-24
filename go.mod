@@ -3,7 +3,6 @@ module github.com/square/spiffe-aws-assume-role
 go 1.19
 
 require (
-	github.com/DataDog/datadog-go v4.8.3+incompatible
 	github.com/alecthomas/kong v0.6.1
 	github.com/armon/go-metrics v0.4.0
 	github.com/aws/aws-sdk-go v1.44.61
@@ -19,6 +18,7 @@ require (
 )
 
 require (
+	github.com/DataDog/datadog-go v4.8.3+incompatible // indirect
 	github.com/Microsoft/go-winio v0.5.2 // indirect
 	github.com/certifi/gocertifi v0.0.0-20210507211836-431795d63e8d // indirect
 	github.com/davecgh/go-spew v1.1.1 // indirect

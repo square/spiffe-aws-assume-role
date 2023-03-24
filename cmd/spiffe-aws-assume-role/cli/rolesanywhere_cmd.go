@@ -60,6 +60,7 @@ func (c *RolesAnywhereCmd) Run(context *CliContext) (err error) {
 // RunRolesAnywhere will assume that the certificate and intermediates are bundled together. Much remains
 // similar between the two functions.
 func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *telemetry.Telemetry) (err error) {
+	telemetry.Metrics.IncrCounter([]string{"Cli", "RunRolesAnywhere", "unknown"}, 1)
 	emitMetrics := telemetry.Instrument([]string{"Cli", "RunRolesAnywhere"}, &err, context.Logger)
 	defer emitMetrics()
 
