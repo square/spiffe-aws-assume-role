@@ -31,7 +31,8 @@ func NewDefaultCliContext() (*CliContext, error) {
 		Logger:            logger,
 		Telemetry:         nullTelemetry,
 		TelemetryOpts: &telemetry.TelemetryOpts{
-			ServiceName: "spiffe_aws_assume_role",
+			ServiceName:    "spiffe_aws_assume_role",
+			ServiceAsLabel: false,
 		},
 	}
 

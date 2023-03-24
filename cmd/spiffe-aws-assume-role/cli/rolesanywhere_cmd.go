@@ -26,19 +26,21 @@ import (
 )
 
 type RolesAnywhereCmd struct {
-	RoleARN         string        `required:"" group:"AWS Config" help:"AWS Role ARN to assume"`
-	TrustAnchorARN  string        `required:"" group:"AWS Config" help:"AWS TrustAnchor ARN to use for RolesAnywhere"`
-	ProfileARN      string        `required:"" group:"AWS Config" help:"AWS Profile ARN to use for RolesAnywhere"`
-	PrivateKey      string        `required:"" group:"AWS Config" help:"Private key for X.509 Certificate"`
-	Certificate     string        `required:"" group:"AWS Config" help:"Certificate to be used with RolesAnywhere"`
-	Endpoint        string        `optional:"" group:"AWS Config" help:"Endpoint to use for the RolesAnywhere Request"`
-	SessionDuration time.Duration `optional:"" group:"AWS Config" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
-	Region          string        `optional:"" group:"AWS Config" help:"Trust Anchor region to use"`
-	WithProxy       bool          `optional:""  group:"AWS Config" help:""`
-	LogFilePath     string        `optional:"" group:"Process Config" help:"Path to log file"`
-	TelemetrySocket string        `optional:"" group:"Process Config" help:"Socket address (TCP/UNIX) to emit metrics to (e.g. 127.0.0.1:8200)"`
-	SentryDSN       string        `optional:"" group:"Process Config" help:"DSN from Sentry for sending errors (e.g.  https://<hash>@o123456.ingest.sentry.io/123456"`
-	Debug           bool          `optional:"" group:"Process Config" help:"Enable debug logging"`
+	RoleARN                 string        `required:"" group:"AWS Config" help:"AWS Role ARN to assume"`
+	TrustAnchorARN          string        `required:"" group:"AWS Config" help:"AWS TrustAnchor ARN to use for RolesAnywhere"`
+	ProfileARN              string        `required:"" group:"AWS Config" help:"AWS Profile ARN to use for RolesAnywhere"`
+	PrivateKey              string        `required:"" group:"AWS Config" help:"Private key for X.509 Certificate"`
+	Certificate             string        `required:"" group:"AWS Config" help:"Certificate to be used with RolesAnywhere"`
+	Endpoint                string        `optional:"" group:"AWS Config" help:"Endpoint to use for the RolesAnywhere Request"`
+	SessionDuration         time.Duration `optional:"" group:"AWS Config" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
+	Region                  string        `optional:"" group:"AWS Config" help:"Trust Anchor region to use"`
+	WithProxy               bool          `optional:""  group:"AWS Config" help:""`
+	LogFilePath             string        `optional:"" group:"Process Config" help:"Path to log file"`
+	TelemetrySocket         string        `optional:"" group:"Telemetry" help:"Socket address (TCP/UNIX) to emit metrics to (e.g. 127.0.0.1:8200)"`
+	TelemetryName           string        `optional:"" group:"Telemetry" help:"Service Name for Telemetry Data"`
+	TelemetryServiceAsLabel bool          `optional:"" group:"Telemetry" help:"Place the Service name as a label instead of prefix"`
+	SentryDSN               string        `optional:"" group:"Process Config" help:"DSN from Sentry for sending errors (e.g.  https://<hash>@o123456.ingest.sentry.io/123456"`
+	Debug                   bool          `optional:"" group:"Process Config" help:"Enable debug logging"`
 }
 
 func (c *RolesAnywhereCmd) Run(context *CliContext) (err error) {
@@ -59,7 +61,7 @@ func (c *RolesAnywhereCmd) Run(context *CliContext) (err error) {
 // RunRolesAnywhere will assume that the certificate and intermediates are bundled together. Much remains
 // similar between the two functions.
 func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *telemetry.Telemetry) (err error) {
-	emitMetrics := telemetry.Instrument([]string{"spiffe_aws_assume_role", "rolesanywhere"}, &err)
+	emitMetrics := telemetry.Instrument([]string{"rolesanywhere"}, &err)
 	defer emitMetrics()
 
 	// If a region is not explicitly specified, retrieve it from the Trust Anchor ARN
@@ -219,6 +221,14 @@ func (c *RolesAnywhereCmd) configureLogger(logger *logrus.Logger) {
 func (c *RolesAnywhereCmd) configureTelemetry(context *CliContext) (t *telemetry.Telemetry, err error) {
 	if c.TelemetrySocket != "" {
 		context.TelemetryOpts.Socket = c.TelemetrySocket
+	}
+
+	if c.TelemetryName != "" {
+		context.TelemetryOpts.ServiceName = c.TelemetryName
+	}
+
+	if c.TelemetryServiceAsLabel {
+		context.TelemetryOpts.ServiceAsLabel = c.TelemetryServiceAsLabel
 	}
 
 	t, err = telemetry.NewTelemetry(context.TelemetryOpts)
