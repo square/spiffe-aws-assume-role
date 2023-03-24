@@ -4,18 +4,18 @@ jobs:
   job:
     runs-on: ubuntu-latest
     steps:
-      - name: Install Go 1.18
-        uses: actions/setup-go@v2
+      - name: Install Go 1.19
+        uses: actions/setup-go@v4
         with:
-          go-version: '1.18'
+          go-version: '1.19'
 
       - name: Check out code
         uses: actions/checkout@v2
 
       - name: Lint code
-        uses: golangci/golangci-lint-action@v2
+        uses: golangci/golangci-lint-action@v3
         with:
-          version: v1.47
+          version: latest
 
       - name: Download dependencies
         run: go mod download
