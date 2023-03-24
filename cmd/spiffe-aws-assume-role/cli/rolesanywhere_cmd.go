@@ -45,7 +45,7 @@ func (c *RolesAnywhereCmd) Run(context *CliContext) (err error) {
 	c.configureLogger(context.Logger)
 	c.configureSentry(context.Logger)
 
-	t, err := c.configureTelemetry()
+	t, err := c.configureTelemetry(context)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to configure telemetry for socket address %s", c.TelemetrySocket))
 	}
@@ -216,9 +216,17 @@ func (c *RolesAnywhereCmd) configureLogger(logger *logrus.Logger) {
 	}
 }
 
-func (c *RolesAnywhereCmd) configureTelemetry() (t *telemetry.Telemetry, err error) {
-	t, err = telemetry.NewTelemetry(c.TelemetrySocket)
-	return
+func (c *RolesAnywhereCmd) configureTelemetry(context *CliContext) (t *telemetry.Telemetry, err error) {
+	var socket string
+	if c.TelemetrySocket == "" {
+		if context.TelemetrySocket != "" {
+			socket = context.TelemetrySocket
+		}
+	} else {
+		socket = c.TelemetrySocket
+	}
+	t, err = telemetry.NewTelemetry(socket)
+	return t, err
 }
 
 func (c *RolesAnywhereCmd) configureSentry(logger *logrus.Logger) {

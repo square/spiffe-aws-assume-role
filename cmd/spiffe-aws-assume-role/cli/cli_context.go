@@ -11,6 +11,7 @@ type CliContext struct {
 	STSProvider       credentials.STSProvider
 	Logger            *logrus.Logger
 	Telemetry         *telemetry.Telemetry
+	TelemetrySocket   string
 }
 
 func NewDefaultCliContext() (*CliContext, error) {

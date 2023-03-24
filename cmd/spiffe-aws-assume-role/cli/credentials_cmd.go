@@ -36,7 +36,7 @@ func (c *CredentialsCmd) Run(context *CliContext) (err error) {
 	c.configureLogger(context.Logger)
 	c.configureSentry(context.Logger)
 
-	t, err := c.configureTelemetry()
+	t, err := c.configureTelemetry(context)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to configure telemetry for socket address %s", c.TelemetrySocket))
 	}
@@ -92,12 +92,21 @@ func (c *CredentialsCmd) configureLogger(logger *logrus.Logger) {
 	}
 }
 
-func (c *CredentialsCmd) configureTelemetry() (t *telemetry.Telemetry, err error) {
-	t, err = telemetry.NewTelemetry(c.TelemetrySocket)
+func (c *CredentialsCmd) configureTelemetry(context *CliContext) (t *telemetry.Telemetry, err error) {
+	var socket string
+	if c.TelemetrySocket == "" {
+		if context.TelemetrySocket != "" {
+			socket = context.TelemetrySocket
+		}
+	} else {
+		socket = c.TelemetrySocket
+	}
+	t, err = telemetry.NewTelemetry(socket)
+
 	if err != nil && len(c.STSRegion) > 0 {
 		t.AddLabel("stsRegion", c.STSRegion)
 	}
-	return
+	return t, err
 }
 
 func (c *CredentialsCmd) configureSentry(logger *logrus.Logger) {
