@@ -43,7 +43,7 @@ func (c *CredentialsCmd) Run(context *CliContext) (err error) {
 	defer t.Close()
 	context.Telemetry = t
 
-	emitMetrics := t.Instrument([]string{"Cli", "Run"}, &err)
+	emitMetrics := t.Instrument([]string{"cli", "oidc"}, &err)
 	defer emitMetrics()
 
 	spiffeID, err := spiffeid.FromString(c.SpiffeID)
@@ -93,19 +93,20 @@ func (c *CredentialsCmd) configureLogger(logger *logrus.Logger) {
 }
 
 func (c *CredentialsCmd) configureTelemetry(context *CliContext) (t *telemetry.Telemetry, err error) {
-	var socket string
-	if c.TelemetrySocket == "" {
-		if context.TelemetrySocket != "" {
-			socket = context.TelemetrySocket
-		}
-	} else {
-		socket = c.TelemetrySocket
+	if c.TelemetrySocket != "" {
+		context.TelemetryOpts.Socket = c.TelemetrySocket
 	}
-	t, err = telemetry.NewTelemetry(socket)
+
+	t, err = telemetry.NewTelemetry(context.TelemetryOpts)
 
 	if err != nil && len(c.STSRegion) > 0 {
 		t.AddLabel("stsRegion", c.STSRegion)
 	}
+
+	for label, value := range context.TelemetryOpts.Labels {
+		t.AddLabel(label, value)
+	}
+
 	return t, err
 }
 

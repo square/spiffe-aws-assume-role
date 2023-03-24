@@ -19,7 +19,8 @@ func TestInstrumentCalls(t *testing.T) {
 	metricSink := mocks.MetricSink{}
 	allowAllCalls(&metricSink)
 
-	telemetry, err := NewTelemetryForSink(&metricSink)
+	opts := &TelemetryOpts{}
+	telemetry, err := NewTelemetryForSink(opts, &metricSink)
 	require.NoError(t, err)
 
 	emitMetrics := telemetry.Instrument([]string{"foo", "bar"}, &err)
@@ -35,7 +36,8 @@ func TestInstrumentLatency(t *testing.T) {
 	metricSink := mocks.MetricSink{}
 	allowAllCalls(&metricSink)
 
-	telemetry, err := NewTelemetryForSink(&metricSink)
+	opts := &TelemetryOpts{}
+	telemetry, err := NewTelemetryForSink(opts, &metricSink)
 	require.NoError(t, err)
 
 	emitMetrics := telemetry.Instrument([]string{"foo", "bar"}, &err)
@@ -52,7 +54,8 @@ func TestInstrumentSuccess(t *testing.T) {
 	metricSink := mocks.MetricSink{}
 	allowAllCalls(&metricSink)
 
-	telemetry, err := NewTelemetryForSink(&metricSink)
+	opts := &TelemetryOpts{}
+	telemetry, err := NewTelemetryForSink(opts, &metricSink)
 	require.NoError(t, err)
 
 	require.NoError(t, methodThatSucceeds(telemetry))
@@ -71,7 +74,8 @@ func TestInstrumentFailure(t *testing.T) {
 	metricSink := mocks.MetricSink{}
 	allowAllCalls(&metricSink)
 
-	telemetry, err := NewTelemetryForSink(&metricSink)
+	opts := &TelemetryOpts{}
+	telemetry, err := NewTelemetryForSink(opts, &metricSink)
 	require.NoError(t, err)
 
 	require.Error(t, methodThatFails(telemetry))
@@ -89,8 +93,10 @@ func TestInstrumentFailure(t *testing.T) {
 func TestInstrumentBuiltInLabels(t *testing.T) {
 	metricSink := mocks.MetricSink{}
 	allowAllCalls(&metricSink)
+	serviceName := "spiffe_aws_assume_role"
 
-	telemetry, err := NewTelemetryForSink(&metricSink)
+	opts := &TelemetryOpts{ServiceName: serviceName}
+	telemetry, err := NewTelemetryForSink(opts, &metricSink)
 	require.NoError(t, err)
 
 	telemetry.Instrument(nil, &err)()
@@ -116,8 +122,10 @@ func TestInstrumentBuiltInLabels(t *testing.T) {
 func TestInstrumentCustomLabel(t *testing.T) {
 	metricSink := mocks.MetricSink{}
 	allowAllCalls(&metricSink)
+	serviceName := "spiffe_aws_assume_role"
 
-	telemetry, err := NewTelemetryForSink(&metricSink)
+	opts := &TelemetryOpts{ServiceName: serviceName}
+	telemetry, err := NewTelemetryForSink(opts, &metricSink)
 	require.NoError(t, err)
 
 	labelName := uuid.New().String()

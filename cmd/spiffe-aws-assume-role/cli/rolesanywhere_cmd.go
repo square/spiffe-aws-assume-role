@@ -59,7 +59,7 @@ func (c *RolesAnywhereCmd) Run(context *CliContext) (err error) {
 // RunRolesAnywhere will assume that the certificate and intermediates are bundled together. Much remains
 // similar between the two functions.
 func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *telemetry.Telemetry) (err error) {
-	emitMetrics := telemetry.Instrument([]string{"Cli", "RunRolesAnywhere"}, &err)
+	emitMetrics := telemetry.Instrument([]string{"cli", "rolesanywhere"}, &err)
 	defer emitMetrics()
 
 	// If a region is not explicitly specified, retrieve it from the Trust Anchor ARN
@@ -217,15 +217,16 @@ func (c *RolesAnywhereCmd) configureLogger(logger *logrus.Logger) {
 }
 
 func (c *RolesAnywhereCmd) configureTelemetry(context *CliContext) (t *telemetry.Telemetry, err error) {
-	var socket string
-	if c.TelemetrySocket == "" {
-		if context.TelemetrySocket != "" {
-			socket = context.TelemetrySocket
-		}
-	} else {
-		socket = c.TelemetrySocket
+	if c.TelemetrySocket != "" {
+		context.TelemetryOpts.Socket = c.TelemetrySocket
 	}
-	t, err = telemetry.NewTelemetry(socket)
+
+	t, err = telemetry.NewTelemetry(context.TelemetryOpts)
+
+	for label, value := range context.TelemetryOpts.Labels {
+		t.AddLabel(label, value)
+	}
+
 	return t, err
 }
 
