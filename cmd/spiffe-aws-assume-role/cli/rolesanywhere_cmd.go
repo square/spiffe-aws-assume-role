@@ -46,7 +46,7 @@ func (c *RolesAnywhereCmd) Run(context *CliContext) (err error) {
 	c.configureSentry(context.Logger)
 
 	t, err := c.configureTelemetry(context)
-	context.Logger.Infoln("context.TelemetrySocket: ", context.TelemetrySocket)
+	context.Logger.Infoln("telemetry: ", t)
 	if err != nil {
 		return errors.Wrap(err, fmt.Sprintf("failed to configure telemetry for socket address %s", c.TelemetrySocket))
 	}
