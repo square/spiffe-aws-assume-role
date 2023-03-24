@@ -23,8 +23,13 @@ type Telemetry struct {
 
 type TelemetryOpts struct {
 	ServiceName string
-	Socket      string
-	Labels      map[string]string
+
+	// ServiceName && AsLabel == service name as label
+	//
+	// ServiceName && !AsLabel == service name as prefix
+	ServiceAsLabel bool
+	Socket         string
+	Labels         map[string]string
 }
 
 var _ Closeable = (*Telemetry)(nil)
@@ -61,7 +66,7 @@ func NewTelemetryForCloseableSink(opts *TelemetryOpts, sink CloseableMetricSink)
 	}
 	_metrics.EnableHostname = false
 	_metrics.EnableHostnameLabel = true
-	_metrics.EnableServiceLabel = (opts.ServiceName == "")
+	_metrics.EnableServiceLabel = opts.ServiceAsLabel
 
 	telemetry := Telemetry{
 		sink:    sink,
