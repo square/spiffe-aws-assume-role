@@ -27,9 +27,11 @@ type TelemetryOpts struct {
 	// ServiceName && AsLabel == service name as label
 	//
 	// ServiceName && !AsLabel == service name as prefix
-	ServiceAsLabel bool
-	Socket         string
-	Labels         map[string]string
+	ServiceAsLabel          bool
+	Socket                  string
+	Labels                  map[string]string
+	OIDCMetricName          []string
+	RolesAnywhereMetricName []string
 }
 
 var _ Closeable = (*Telemetry)(nil)

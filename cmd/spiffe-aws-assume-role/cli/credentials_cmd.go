@@ -45,7 +45,7 @@ func (c *CredentialsCmd) Run(context *CliContext) (err error) {
 	defer t.Close()
 	context.Telemetry = t
 
-	emitMetrics := t.Instrument([]string{"oidc"}, &err)
+	emitMetrics := t.Instrument(context.TelemetryOpts.OIDCMetricName, &err)
 	defer emitMetrics()
 
 	spiffeID, err := spiffeid.FromString(c.SpiffeID)
