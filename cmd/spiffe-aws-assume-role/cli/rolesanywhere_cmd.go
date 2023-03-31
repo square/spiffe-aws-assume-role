@@ -146,6 +146,7 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 	client := &http.Client{Transport: tr}
 	config := aws.NewConfig().WithRegion(c.Region).WithHTTPClient(client).WithLogLevel(logLevel)
 	if c.Endpoint != "" {
+		context.Logger.Infoln(c.Endpoint)
 		config.WithEndpoint(c.Endpoint)
 	}
 	rolesAnywhereClient := rolesanywhere.New(mySession, config)
