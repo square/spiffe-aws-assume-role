@@ -6,7 +6,7 @@ require (
 	github.com/DataDog/datadog-go v4.8.3+incompatible
 	github.com/alecthomas/kong v0.7.1
 	github.com/armon/go-metrics v0.4.1
-	github.com/aws/aws-sdk-go v1.44.229
+	github.com/aws/aws-sdk-go v1.44.236
 	github.com/aws/rolesanywhere-credential-helper v1.0.4
 	github.com/channelmeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
 	github.com/evalphobia/logrus_sentry v0.8.2

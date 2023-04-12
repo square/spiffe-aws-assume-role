@@ -10,12 +10,17 @@ import (
 	"net/http"
 	"os"
 	"runtime"
+	"strings"
 	"time"
 
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
+	"github.com/aws/aws-sdk-go/aws/credentials"
+
+	// "github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
+	"github.com/aws/aws-sdk-go/service/sts"
 	helper "github.com/aws/rolesanywhere-credential-helper/aws_signing_helper"
 	rolesanywhere "github.com/aws/rolesanywhere-credential-helper/rolesanywhere"
 	"github.com/evalphobia/logrus_sentry"
@@ -27,6 +32,7 @@ import (
 
 type RolesAnywhereCmd struct {
 	RoleARN                 string        `required:"" group:"AWS Config" help:"AWS Role ARN to assume"`
+	JumpRoleARN             string        `optional:"" group:"AWS Config" help:"AWS Role in Trust Anchor account to assume role from"`
 	TrustAnchorARN          string        `required:"" group:"AWS Config" help:"AWS TrustAnchor ARN to use for RolesAnywhere"`
 	ProfileARN              string        `required:"" group:"AWS Config" help:"AWS Profile ARN to use for RolesAnywhere"`
 	PrivateKey              string        `required:"" group:"AWS Config" help:"Private key for X.509 Certificate"`
@@ -64,14 +70,26 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 	emitMetrics := telemetry.Instrument(context.TelemetryOpts.RolesAnywhereMetricName, &err)
 	defer emitMetrics()
 
+	taArn, err := arn.Parse(c.TrustAnchorARN)
+	if err != nil {
+		return err
+	}
+
 	// If a region is not explicitly specified, retrieve it from the Trust Anchor ARN
 	if c.Region == "" {
-		taArn, err := arn.Parse(c.TrustAnchorARN)
-		if err != nil {
-			return err
-		}
-
 		c.Region = taArn.Region
+	}
+
+	targetRoleArn, err := arn.Parse(c.RoleARN)
+	if err != nil {
+		return err
+	}
+
+	var rolesAnywhereRoleArn string
+	if c.JumpRoleARN == "" {
+		rolesAnywhereRoleArn = c.RoleARN
+	} else {
+		rolesAnywhereRoleArn = c.JumpRoleARN
 	}
 
 	// Read Private Key file and make into a crypto.PrivateKey
@@ -146,7 +164,6 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 	client := &http.Client{Transport: tr}
 	config := aws.NewConfig().WithRegion(c.Region).WithHTTPClient(client).WithLogLevel(logLevel)
 	if c.Endpoint != "" {
-		context.Logger.Infoln(c.Endpoint)
 		config.WithEndpoint(c.Endpoint)
 	}
 	rolesAnywhereClient := rolesanywhere.New(mySession, config)
@@ -163,7 +180,7 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 		TrustAnchorArn:     &c.TrustAnchorARN,
 		DurationSeconds:    &(durationSeconds),
 		InstanceProperties: nil,
-		RoleArn:            &c.RoleARN,
+		RoleArn:            &rolesAnywhereRoleArn,
 		SessionName:        nil,
 	}
 
@@ -178,23 +195,59 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 		return errors.New(msg)
 	}
 
-	// Parse the temporary credentials
-	credentials := output.CredentialSet[0].Credentials
-	credentialProcessOutput := helper.CredentialProcessOutput{
-		Version:         1,
-		AccessKeyId:     *credentials.AccessKeyId,
-		SecretAccessKey: *credentials.SecretAccessKey,
-		SessionToken:    *credentials.SessionToken,
-		Expiration:      *credentials.Expiration,
+	var credentialsOut helper.CredentialProcessOutput
+	taRoleCredentials := output.CredentialSet[0].Credentials
+
+	if targetRoleArn.AccountID == taArn.AccountID {
+		credentialsOut = helper.CredentialProcessOutput{
+			Version:         1,
+			AccessKeyId:     *taRoleCredentials.AccessKeyId,
+			SecretAccessKey: *taRoleCredentials.SecretAccessKey,
+			SessionToken:    *taRoleCredentials.SessionToken,
+			Expiration:      *taRoleCredentials.Expiration,
+		}
+	} else {
+		// Parse the temporary credentials
+		credsForSts := aws.NewConfig().WithCredentials(credentials.NewStaticCredentials(*taRoleCredentials.AccessKeyId, *taRoleCredentials.SecretAccessKey, *taRoleCredentials.SessionToken)).WithRegion("us-west-2").WithLogLevel(logLevel)
+		stsSession := session.Must(session.NewSession(credsForSts))
+
+		stsClient := sts.New(stsSession)
+
+		spiffeuri := certificate.URIs[0]
+		sessionUriName := strings.ReplaceAll((spiffeuri.Hostname() + spiffeuri.EscapedPath()), "/", ".")
+
+		sessionName := "RolesAnywhere"
+		if certificate.URIs != nil && len(certificate.URIs) > 0 {
+			sessionName = sessionUriName
+		} else if len(certificate.Subject.OrganizationalUnit) > 0 {
+			sessionName = certificate.Subject.OrganizationalUnit[0]
+		} else {
+			sessionName = certificate.Subject.CommonName
+		}
+
+		arInput := &sts.AssumeRoleInput{
+			DurationSeconds: aws.Int64(900),
+			RoleArn:         aws.String(c.RoleARN),
+			RoleSessionName: aws.String(sessionName),
+		}
+
+		arOutput, err := stsClient.AssumeRole(arInput)
+		if err != nil {
+			return errors.Wrap(err, "failed to generate temporary credentials")
+		}
+
+		credentials := arOutput.Credentials
+
+		credentialsOut = helper.CredentialProcessOutput{
+			Version:         1,
+			AccessKeyId:     *credentials.AccessKeyId,
+			SecretAccessKey: *credentials.SecretAccessKey,
+			SessionToken:    *credentials.SessionToken,
+			Expiration:      credentials.Expiration.Format(time.RFC3339),
+		}
 	}
 
-	// RolesAnywhereHelper will use the CreateSession API and sign the request
-	// and returns credentialProcessOutput as a json
-	if err != nil {
-		return errors.Wrap(err, "failed to generate temporary credentials")
-	}
-
-	buf, err := json.Marshal(credentialProcessOutput)
+	buf, err := json.Marshal(credentialsOut)
 	if err != nil {
 		return errors.Wrap(err, "failed to marshal temporary credentials")
 	}
