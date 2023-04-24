@@ -17,7 +17,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/credentials"
 
-	// "github.com/aws/aws-sdk-go/aws/credentials/stscreds"
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
@@ -70,6 +69,7 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 	emitMetrics := telemetry.Instrument(context.TelemetryOpts.RolesAnywhereMetricName, &err)
 	defer emitMetrics()
 
+	// Parse the Trust Anchor Arn -- will inform some later decisions
 	taArn, err := arn.Parse(c.TrustAnchorARN)
 	if err != nil {
 		return err
@@ -80,11 +80,16 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 		c.Region = taArn.Region
 	}
 
+	// Parse the intended role-to-assume
 	targetRoleArn, err := arn.Parse(c.RoleARN)
 	if err != nil {
 		return err
 	}
 
+	// Set the RolesAnywhere role being used
+	// In the case that we want to do cross account access we first need to authenticate with
+	// the account that owns the trust anchor and then assume the *actual* role that we want
+	// using the Trust Anchor Account role
 	var rolesAnywhereRoleArn string
 	if c.JumpRoleARN == "" {
 		rolesAnywhereRoleArn = c.RoleARN
@@ -125,6 +130,7 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 		keyType = ""
 	}
 
+	// List supported algorithms
 	supportedAlgorithms := []string{
 		fmt.Sprintf("%sSHA256", keyType),
 		fmt.Sprintf("%sSHA384", keyType),
@@ -139,6 +145,7 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 		Algorithms:      supportedAlgorithms,
 	}
 
+	// Start a new session
 	mySession := session.Must(session.NewSession())
 
 	var logLevel aws.LogLevelType
@@ -190,14 +197,17 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 		return err
 	}
 
+	// Make sure we got temp creds from AWS
 	if len(output.CredentialSet) == 0 {
 		msg := "unable to obtain temporary security credentials from CreateSession"
 		return errors.New(msg)
 	}
-
-	var credentialsOut helper.CredentialProcessOutput
 	taRoleCredentials := output.CredentialSet[0].Credentials
 
+	// credentialsOut will be the final printed value for credentials
+	var credentialsOut helper.CredentialProcessOutput
+
+	// And if the target account is in the TA account, just set and we're happy
 	if targetRoleArn.AccountID == taArn.AccountID {
 		credentialsOut = helper.CredentialProcessOutput{
 			Version:         1,
@@ -213,14 +223,16 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 
 		stsClient := sts.New(stsSession)
 
-		spiffeuri := certificate.URIs[0]
-		sessionUriName := strings.ReplaceAll((spiffeuri.Hostname() + spiffeuri.EscapedPath()), "/", ".")
+		var sessionName string
 
-		sessionName := "RolesAnywhere"
+		// If we can use a URI to form a session name, do that
 		if certificate.URIs != nil && len(certificate.URIs) > 0 {
-			sessionName = sessionUriName
+			sessionName = strings.ReplaceAll((certificate.URIs[0].Hostname() + certificate.URIs[0].EscapedPath()), "/", ".")
+
+			// Otherwise use the OU
 		} else if len(certificate.Subject.OrganizationalUnit) > 0 {
 			sessionName = certificate.Subject.OrganizationalUnit[0]
+			// Otherwise use the common name
 		} else {
 			sessionName = certificate.Subject.CommonName
 		}
@@ -231,6 +243,7 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 			RoleSessionName: aws.String(sessionName),
 		}
 
+		// Assume our target role
 		arOutput, err := stsClient.AssumeRole(arInput)
 		if err != nil {
 			return errors.Wrap(err, "failed to generate temporary credentials")
