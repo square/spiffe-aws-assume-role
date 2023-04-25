@@ -15,7 +15,7 @@ jobs:
       - name: Lint code
         uses: golangci/golangci-lint-action@v3
         with:
-          version: latest
+          version: v1.52.2
 
       - name: Download dependencies
         run: go mod download
