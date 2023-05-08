@@ -1,6 +1,7 @@
 package cli
 
 import (
+	"crypto"
 	"crypto/tls"
 	"crypto/x509"
 	"encoding/base64"
@@ -20,8 +21,10 @@ import (
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
-	helper "github.com/aws/rolesanywhere-credential-helper/aws_signing_helper"
+	"github.com/aws/aws-sdk-go/service/sts/stsiface"
+	"github.com/aws/rolesanywhere-credential-helper/aws_signing_helper"
 	rolesanywhere "github.com/aws/rolesanywhere-credential-helper/rolesanywhere"
+	"github.com/aws/rolesanywhere-credential-helper/rolesanywhere/rolesanywhereiface"
 	"github.com/evalphobia/logrus_sentry"
 	"github.com/pkg/errors"
 	"github.com/sirupsen/logrus"
@@ -48,6 +51,25 @@ type RolesAnywhereCmd struct {
 	Debug                   bool          `optional:"" group:"Process Config" help:"Enable debug logging"`
 }
 
+type rolesAnywhereSignerData struct {
+	privateKey    crypto.PrivateKey
+	certificate   x509.Certificate
+	intermediates []x509.Certificate
+	data          aws_signing_helper.CertificateData
+}
+
+type rolesanywhereCreateCredsInput struct {
+	createSessionRequest *rolesanywhere.CreateSessionInput
+	rolesAnywhereClient  rolesanywhereiface.RolesAnywhereAPI
+	signerData           *rolesAnywhereSignerData
+}
+
+type stsCreateCredsInput struct {
+	stsClient       stsiface.STSAPI
+	signerData      *rolesAnywhereSignerData
+	sessionDuration int64
+}
+
 func (c *RolesAnywhereCmd) Run(context *CliContext) (err error) {
 	c.configureLogger(context.Logger)
 	c.configureSentry(context.Logger)
@@ -69,43 +91,148 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 	emitMetrics := telemetry.Instrument(context.TelemetryOpts.RolesAnywhereMetricName, &err)
 	defer emitMetrics()
 
-	// Parse the Trust Anchor Arn -- will inform some later decisions
-	taArn, err := arn.Parse(c.TrustAnchorARN)
+	var logLevel aws.LogLevelType
+	if c.Debug {
+		logLevel = aws.LogDebug
+	} else {
+		logLevel = aws.LogOff
+	}
+
+	// AWS calls use duration in in64 seconds
+	durationSeconds := int64(c.SessionDuration.Seconds())
+
+	// Determine if a jump role is required to be used, and which role to call with RolesAnywhere
+	requireJump, rolesAnywhereArn, err := c.extractMultiAccountValues()
 	if err != nil {
 		return err
 	}
 
+	// Get certificate information and private key to use for RolesAnywhere
+	signerData, err := c.extractCertificateData()
+	if err != nil {
+		return err
+	}
+
+	// Configure a client to use with RolesAnywhere
+	rolesAnywhereClient, err := c.configureRolesAnywhereClient(signerData, logLevel)
+	if err != nil {
+		return err
+	}
+
+	// If we aren't using RolesAnywhere long-term, keep credential lifetime to a minimum
+	// 15 minutes (900 seconds)
+	rolesAnywhereDuration := int64((time.Minute * 15) / (time.Second))
+	if !requireJump {
+		rolesAnywhereDuration = durationSeconds
+	}
+
+	createRolesAnywhereCredsInput := rolesanywhereCreateCredsInput{
+		createSessionRequest: &rolesanywhere.CreateSessionInput{
+			Cert:               &signerData.data.CertificateData,
+			ProfileArn:         &c.ProfileARN,
+			TrustAnchorArn:     &c.TrustAnchorARN,
+			DurationSeconds:    &rolesAnywhereDuration,
+			InstanceProperties: nil,
+			RoleArn:            &rolesAnywhereArn,
+			SessionName:        nil,
+		},
+		rolesAnywhereClient: rolesAnywhereClient,
+		signerData:          signerData,
+	}
+
+	// Get RolesAnywhere Creds
+	output, err := c.createRolesAnywhereCreds(createRolesAnywhereCredsInput)
+
+	// Use the RolesAnywhere Creds to jump to other account's role
+	if requireJump {
+		stsClient, err := c.createStsClient(output, logLevel)
+		if err != nil {
+			return err
+		}
+
+		createCredsInput := &stsCreateCredsInput{
+			stsClient:       stsClient,
+			signerData:      signerData,
+			sessionDuration: durationSeconds,
+		}
+		output, err = c.createStsCredentials(createCredsInput)
+		if err != nil {
+			return err
+		}
+	}
+
+	buf, err := json.Marshal(output)
+	if err != nil {
+		return errors.Wrap(err, "failed to marshal temporary credentials")
+	}
+
+	// Print the string formatted credentialProcessOutput for consumption by credentials-process
+	_, err = fmt.Print(string(buf[:]))
+
+	return err
+}
+
+// Extract the requirement for usage of a Jump Role and which Role to use for the RolesAnywhere call
+func (c *RolesAnywhereCmd) extractMultiAccountValues() (requireJump bool, rolesAnywhereArn string, err error) {
+	// Parse the Trust Anchor Arn -- will inform some later decisions
+	trustAnchorArn, err := arn.Parse(c.TrustAnchorARN)
+	if err != nil {
+		return false, "", err
+	}
+
 	// If a region is not explicitly specified, retrieve it from the Trust Anchor ARN
 	if c.Region == "" {
-		c.Region = taArn.Region
+		c.Region = trustAnchorArn.Region
 	}
 
 	// Parse the intended role-to-assume
 	targetRoleArn, err := arn.Parse(c.RoleARN)
 	if err != nil {
-		return err
+		return false, "", err
 	}
 
-	// Set the RolesAnywhere role being used
-	// In the case that we want to do cross account access we first need to authenticate with
-	// the account that owns the trust anchor and then assume the *actual* role that we want
-	// using the Trust Anchor Account role
-	var rolesAnywhereRoleArn string
-	if c.JumpRoleARN == "" {
-		rolesAnywhereRoleArn = c.RoleARN
-	} else {
-		rolesAnywhereRoleArn = c.JumpRoleARN
+	// Optimistically assume that the target role is in the trust anchor account
+	rolesAnywhereArn = c.RoleARN
+	requireJump = false
+
+	// If the target role is not in the trust anchor account, a jump role is required
+	if targetRoleArn.AccountID != trustAnchorArn.AccountID {
+		requireJump = true
+
+		if c.JumpRoleARN == "" {
+			return false, "", fmt.Errorf("cross-account access is currently not supported by the RolesAnywhere service")
+		}
+
+		jumpRoleArn, err := arn.Parse(c.JumpRoleARN)
+		if err != nil {
+			return false, "", fmt.Errorf("malformed jump role arn")
+		}
+
+		if jumpRoleArn.AccountID != trustAnchorArn.AccountID {
+			return false, "", fmt.Errorf("jump role is not in the same account as trust anchor")
+		}
+
+		rolesAnywhereArn = c.JumpRoleARN
 	}
+
+	return requireJump, rolesAnywhereArn, nil
+}
+
+// Extract certificate data from the files provided as arguments to the command
+func (c *RolesAnywhereCmd) extractCertificateData() (*rolesAnywhereSignerData, error) {
 
 	// Read Private Key file and make into a crypto.PrivateKey
-	privateKey, err := helper.ReadPrivateKeyData(c.PrivateKey)
+	privateKey, err := aws_signing_helper.ReadPrivateKeyData(c.PrivateKey)
+	if err != nil {
+		return nil, err
+	}
 
 	// Read the certificate bundle (inclusive of leaf certificate)
 	var certificateChain []x509.Certificate
 	{
-		certificateChainPointers, err := helper.ReadCertificateBundleData(c.Certificate)
+		certificateChainPointers, err := aws_signing_helper.ReadCertificateBundleData(c.Certificate)
 		if err != nil {
-			return err
+			return nil, err
 		}
 		for _, certificate := range certificateChainPointers {
 			certificateChain = append(certificateChain, *certificate)
@@ -138,22 +265,21 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 	}
 
 	// Populate the certificate data for the signing a session request
-	certificateData := helper.CertificateData{
+	certificateData := aws_signing_helper.CertificateData{
 		KeyType:         keyType,
 		CertificateData: base64.StdEncoding.EncodeToString(certificate.Raw),
 		SerialNumber:    certificate.SerialNumber.String(),
 		Algorithms:      supportedAlgorithms,
 	}
 
+	// Return the private key and certificate data for use in RolesAnywhere
+	return &rolesAnywhereSignerData{privateKey, certificate, intermediates, certificateData}, nil
+}
+
+// Configure a client to use RolesAnywhere and its Sigv4 signing scheme
+func (c *RolesAnywhereCmd) configureRolesAnywhereClient(signData *rolesAnywhereSignerData, logLevel aws.LogLevelType) (*rolesanywhere.RolesAnywhere, error) {
 	// Start a new session
 	mySession := session.Must(session.NewSession())
-
-	var logLevel aws.LogLevelType
-	if c.Debug {
-		logLevel = aws.LogDebug
-	} else {
-		logLevel = aws.LogOff
-	}
 
 	var tr *http.Transport
 	if c.WithProxy {
@@ -177,98 +303,77 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 	rolesAnywhereClient.Handlers.Build.RemoveByName("core.SDKVersionUserAgentHandler")
 	rolesAnywhereClient.Handlers.Build.PushBackNamed(request.NamedHandler{Name: "v4x509.SpiffeAwsAssumeRoleUserAgentHandler", Fn: request.MakeAddToUserAgentHandler("SpiffeAwsAssumeRole", "1", runtime.Version(), runtime.GOOS, runtime.GOARCH)})
 	rolesAnywhereClient.Handlers.Sign.Clear()
-	rolesAnywhereClient.Handlers.Sign.PushBackNamed(request.NamedHandler{Name: "v4x509.SignRequestHandler", Fn: helper.CreateSignFunction(privateKey, certificate, intermediates)})
+	rolesAnywhereClient.Handlers.Sign.PushBackNamed(request.NamedHandler{Name: "v4x509.SignRequestHandler", Fn: aws_signing_helper.CreateSignFunction(signData.privateKey, signData.certificate, signData.intermediates)})
 
-	// Create the Session Request Object
-	durationSeconds := int64(c.SessionDuration.Seconds())
-	createSessionRequest := rolesanywhere.CreateSessionInput{
-		Cert:               &certificateData.CertificateData,
-		ProfileArn:         &c.ProfileARN,
-		TrustAnchorArn:     &c.TrustAnchorARN,
-		DurationSeconds:    &(durationSeconds),
-		InstanceProperties: nil,
-		RoleArn:            &rolesAnywhereRoleArn,
-		SessionName:        nil,
-	}
+	return rolesAnywhereClient, nil
+}
 
+// Use a RolesAnywhere client to collect Role credentials
+func (c *RolesAnywhereCmd) createRolesAnywhereCreds(input rolesanywhereCreateCredsInput) (*aws_signing_helper.CredentialProcessOutput, error) {
 	// Create the session
-	output, err := rolesAnywhereClient.CreateSession(&createSessionRequest)
+	output, err := input.rolesAnywhereClient.CreateSession(input.createSessionRequest)
 	if err != nil {
-		return err
+		return nil, err
 	}
 
 	// Make sure we got temp creds from AWS
 	if len(output.CredentialSet) == 0 {
-		msg := "unable to obtain temporary security credentials from CreateSession"
-		return errors.New(msg)
+		return nil, fmt.Errorf("unable to obtain temporary security credentials from CreateSession")
 	}
-	taRoleCredentials := output.CredentialSet[0].Credentials
+	rolesAnywhereCredentials := output.CredentialSet[0].Credentials
+	return &aws_signing_helper.CredentialProcessOutput{
+		Version:         1,
+		AccessKeyId:     *rolesAnywhereCredentials.AccessKeyId,
+		SecretAccessKey: *rolesAnywhereCredentials.SecretAccessKey,
+		SessionToken:    *rolesAnywhereCredentials.SessionToken,
+		Expiration:      *rolesAnywhereCredentials.Expiration,
+	}, nil
+}
 
-	// credentialsOut will be the final printed value for credentials
-	var credentialsOut helper.CredentialProcessOutput
+// Create a new STS Client to use with the Jump Role
+func (c *RolesAnywhereCmd) createStsClient(jumpCreds *aws_signing_helper.CredentialProcessOutput, logLevel aws.LogLevelType) (stsiface.STSAPI, error) {
+	credsForSts := aws.NewConfig().WithCredentials(
+		credentials.NewStaticCredentials(
+			jumpCreds.AccessKeyId, jumpCreds.SecretAccessKey, jumpCreds.SessionToken,
+		),
+	).WithRegion("us-west-2").WithLogLevel(logLevel)
 
-	// And if the target account is in the TA account, just set and we're happy
-	if targetRoleArn.AccountID == taArn.AccountID {
-		credentialsOut = helper.CredentialProcessOutput{
-			Version:         1,
-			AccessKeyId:     *taRoleCredentials.AccessKeyId,
-			SecretAccessKey: *taRoleCredentials.SecretAccessKey,
-			SessionToken:    *taRoleCredentials.SessionToken,
-			Expiration:      *taRoleCredentials.Expiration,
-		}
+	stsSession := session.Must(session.NewSession(credsForSts))
+
+	return sts.New(stsSession), nil
+}
+
+// Assume the Target Role from the Jump Role, setting the session name to the SPIFFE URI if possible
+// or to the Common Name if not
+func (c *RolesAnywhereCmd) createStsCredentials(input *stsCreateCredsInput) (*aws_signing_helper.CredentialProcessOutput, error) {
+	var sessionName string
+	// If we can use a URI to form a session name, do that
+	if input.signerData.certificate.URIs != nil && len(input.signerData.certificate.URIs) > 0 {
+		sessionName = strings.ReplaceAll((input.signerData.certificate.URIs[0].Hostname() + input.signerData.certificate.URIs[0].EscapedPath()), "/", ".")
 	} else {
-		// Parse the temporary credentials
-		credsForSts := aws.NewConfig().WithCredentials(credentials.NewStaticCredentials(*taRoleCredentials.AccessKeyId, *taRoleCredentials.SecretAccessKey, *taRoleCredentials.SessionToken)).WithRegion("us-west-2").WithLogLevel(logLevel)
-		stsSession := session.Must(session.NewSession(credsForSts))
-
-		stsClient := sts.New(stsSession)
-
-		var sessionName string
-
-		// If we can use a URI to form a session name, do that
-		if certificate.URIs != nil && len(certificate.URIs) > 0 {
-			sessionName = strings.ReplaceAll((certificate.URIs[0].Hostname() + certificate.URIs[0].EscapedPath()), "/", ".")
-
-			// Otherwise use the OU
-		} else if len(certificate.Subject.OrganizationalUnit) > 0 {
-			sessionName = certificate.Subject.OrganizationalUnit[0]
-			// Otherwise use the common name
-		} else {
-			sessionName = certificate.Subject.CommonName
-		}
-
-		arInput := &sts.AssumeRoleInput{
-			DurationSeconds: aws.Int64(900),
-			RoleArn:         aws.String(c.RoleARN),
-			RoleSessionName: aws.String(sessionName),
-		}
-
-		// Assume our target role
-		arOutput, err := stsClient.AssumeRole(arInput)
-		if err != nil {
-			return errors.Wrap(err, "failed to generate temporary credentials")
-		}
-
-		credentials := arOutput.Credentials
-
-		credentialsOut = helper.CredentialProcessOutput{
-			Version:         1,
-			AccessKeyId:     *credentials.AccessKeyId,
-			SecretAccessKey: *credentials.SecretAccessKey,
-			SessionToken:    *credentials.SessionToken,
-			Expiration:      credentials.Expiration.Format(time.RFC3339),
-		}
+		sessionName = input.signerData.certificate.Subject.CommonName
 	}
 
-	buf, err := json.Marshal(credentialsOut)
+	arInput := &sts.AssumeRoleInput{
+		DurationSeconds: &input.sessionDuration,
+		RoleArn:         &c.RoleARN,
+		RoleSessionName: &sessionName,
+	}
+
+	// Assume our target role
+	arOutput, err := input.stsClient.AssumeRole(arInput)
 	if err != nil {
-		return errors.Wrap(err, "failed to marshal temporary credentials")
+		return nil, errors.Wrap(err, "failed to generate temporary credentials")
 	}
 
-	// Print the string formatted credentialProcessOutput for consumption by credentials-process
-	_, err = fmt.Print(string(buf[:]))
-
-	return err
+	// Return creds in Credential Process Output format
+	return &aws_signing_helper.CredentialProcessOutput{
+		Version:         1,
+		AccessKeyId:     *arOutput.Credentials.AccessKeyId,
+		SecretAccessKey: *arOutput.Credentials.SecretAccessKey,
+		SessionToken:    *arOutput.Credentials.SessionToken,
+		Expiration:      arOutput.Credentials.Expiration.Format(time.RFC3339),
+	}, nil
 }
 
 func (c *RolesAnywhereCmd) configureLogger(logger *logrus.Logger) {
@@ -299,6 +404,9 @@ func (c *RolesAnywhereCmd) configureTelemetry(context *CliContext) (t *telemetry
 	}
 
 	t, err = telemetry.NewTelemetry(context.TelemetryOpts)
+	if err != nil {
+		return nil, err
+	}
 
 	for label, value := range context.TelemetryOpts.Labels {
 		t.AddLabel(label, value)

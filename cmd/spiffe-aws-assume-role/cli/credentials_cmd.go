@@ -108,6 +108,9 @@ func (c *CredentialsCmd) configureTelemetry(context *CliContext) (t *telemetry.T
 	}
 
 	t, err = telemetry.NewTelemetry(context.TelemetryOpts)
+	if err != nil {
+		return nil, err
+	}
 
 	if err != nil && len(c.STSRegion) > 0 {
 		t.AddLabel("stsRegion", c.STSRegion)
