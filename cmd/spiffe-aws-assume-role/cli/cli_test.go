@@ -17,6 +17,7 @@ import (
 	"github.com/square/spiffe-aws-assume-role/internal/mocks"
 	"github.com/square/spiffe-aws-assume-role/internal/test"
 	"github.com/square/spiffe-aws-assume-role/pkg/credentials"
+	"github.com/square/spiffe-aws-assume-role/pkg/telemetry"
 	"github.com/stretchr/testify/mock"
 	"github.com/stretchr/testify/require"
 )
@@ -168,6 +169,7 @@ func TestSetsCustomSessionDuration(t *testing.T) {
 		JWTSourceProvider: credentials.StaticJWTSourceProvider(&jwtSource),
 		STSProvider:       credentials.StaticSTSProvider(&stsClient),
 		Logger:            logrus.New(),
+		TelemetryOpts:     &telemetry.TelemetryOpts{},
 	}
 
 	failOnError(t, Run(&context, args))
@@ -222,6 +224,7 @@ func TestSetsCustomStsEndpoint(t *testing.T) {
 		JWTSourceProvider: credentials.StaticJWTSourceProvider(&jwtSource),
 		STSProvider:       stsProvider,
 		Logger:            logrus.New(),
+		TelemetryOpts:     &telemetry.TelemetryOpts{},
 	}
 
 	failOnError(t, Run(&context, args))
@@ -275,6 +278,7 @@ func TestSetsCustomStsRegion(t *testing.T) {
 		JWTSourceProvider: credentials.StaticJWTSourceProvider(&jwtSource),
 		STSProvider:       stsProvider,
 		Logger:            logrus.New(),
+		TelemetryOpts:     &telemetry.TelemetryOpts{},
 	}
 
 	failOnError(t, Run(&context, args))

@@ -11,6 +11,7 @@ type CliContext struct {
 	STSProvider       credentials.STSProvider
 	Logger            *logrus.Logger
 	Telemetry         *telemetry.Telemetry
+	TelemetryOpts     *telemetry.TelemetryOpts
 }
 
 func NewDefaultCliContext() (*CliContext, error) {
@@ -19,7 +20,7 @@ func NewDefaultCliContext() (*CliContext, error) {
 	// time="2021-03-01T16:28:51-08:00" level=error msg="failed to parse SPIFFE ID from 305d07ed-765e-4642-9bd3-4c74aa86f5ed: spiffeid: invalid scheme"
 	logger.SetFormatter(&logrus.TextFormatter{})
 
-	telemetry, err := telemetry.NullTelemetry()
+	nullTelemetry, err := telemetry.NullTelemetry()
 	if err != nil {
 		return nil, err
 	}
@@ -28,7 +29,13 @@ func NewDefaultCliContext() (*CliContext, error) {
 		JWTSourceProvider: credentials.StandardJWTSourceProvider,
 		STSProvider:       credentials.StandardSTSProvider,
 		Logger:            logger,
-		Telemetry:         telemetry,
+		Telemetry:         nullTelemetry,
+		TelemetryOpts: &telemetry.TelemetryOpts{
+			ServiceName:             "SpiffeAwsAssumeRole",
+			ServiceAsLabel:          true,
+			OIDCMetricName:          []string{"Cli", "Run"},
+			RolesAnywhereMetricName: []string{"Cli", "RunRolesAnywhere"},
+		},
 	}
 
 	return context, nil
