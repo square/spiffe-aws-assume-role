@@ -174,7 +174,6 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 
 // Extract the requirement for usage of a Jump Role and which Role to use for the RolesAnywhere call
 func (c *RolesAnywhereCmd) extractMultiAccountValues() (requireJump bool, rolesAnywhereArn string, err error) {
-	// Parse the Trust Anchor Arn -- will inform some later decisions
 	trustAnchorArn, err := arn.Parse(c.TrustAnchorARN)
 	if err != nil {
 		return false, "", err
@@ -200,16 +199,16 @@ func (c *RolesAnywhereCmd) extractMultiAccountValues() (requireJump bool, rolesA
 		requireJump = true
 
 		if c.JumpRoleARN == "" {
-			return false, "", fmt.Errorf("cross-account access is currently not supported by the RolesAnywhere service")
+			return false, "", fmt.Errorf("cross-account access is currently not supported by the RolesAnywhere service: %w", err)
 		}
 
 		jumpRoleArn, err := arn.Parse(c.JumpRoleARN)
 		if err != nil {
-			return false, "", fmt.Errorf("malformed jump role arn")
+			return false, "", err
 		}
 
 		if jumpRoleArn.AccountID != trustAnchorArn.AccountID {
-			return false, "", fmt.Errorf("jump role is not in the same account as trust anchor")
+			return false, "", fmt.Errorf("jump role is not in the same account as trust anchor: %w", err)
 		}
 
 		rolesAnywhereArn = c.JumpRoleARN
