@@ -324,7 +324,7 @@ func (c *RolesAnywhereCmd) createRolesAnywhereCreds(input rolesanywhereCreateCre
 	}
 
 	// Make sure we got temp creds from AWS
-	if len(output.CredentialSet) == 0 {
+	if len(output.CredentialSet) == 0 || output.CredentialSet[0].Credentials == nil {
 		return nil, fmt.Errorf("unable to obtain temporary security credentials from CreateSession")
 	}
 	rolesAnywhereCredentials := output.CredentialSet[0].Credentials
