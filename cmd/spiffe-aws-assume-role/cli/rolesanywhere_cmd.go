@@ -142,6 +142,9 @@ func (c *RolesAnywhereCmd) RunRolesAnywhere(context *CliContext, telemetry *tele
 
 	// Get RolesAnywhere Creds
 	output, err := c.createRolesAnywhereCreds(createRolesAnywhereCredsInput)
+	if err != nil {
+		return err
+	}
 
 	// Use the RolesAnywhere Creds to jump to other account's role
 	if requireJump {
@@ -316,7 +319,7 @@ func (c *RolesAnywhereCmd) createRolesAnywhereCreds(input rolesanywhereCreateCre
 	}
 
 	// Make sure we got temp creds from AWS
-	if len(output.CredentialSet) == 0 {
+	if len(output.CredentialSet) == 0 || output.CredentialSet[0].Credentials == nil {
 		return nil, fmt.Errorf("unable to obtain temporary security credentials from CreateSession")
 	}
 	rolesAnywhereCredentials := output.CredentialSet[0].Credentials
