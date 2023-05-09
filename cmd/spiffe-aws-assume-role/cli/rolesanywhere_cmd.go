@@ -49,7 +49,6 @@ type RolesAnywhereCmd struct {
 	TelemetryServiceAsLabel bool          `optional:"" group:"Telemetry" help:"Place the Service name as a label instead of prefix"`
 	SentryDSN               string        `optional:"" group:"Process Config" help:"DSN from Sentry for sending errors (e.g.  https://<hash>@o123456.ingest.sentry.io/123456"`
 	Debug                   bool          `optional:"" group:"Process Config" help:"Enable debug logging"`
-	IgnoreIntermediates     bool          `optional:"" group:"Process Config" help:"Ignore bundled certificate intermediates"`
 }
 
 type rolesAnywhereSignerData struct {
@@ -245,12 +244,8 @@ func (c *RolesAnywhereCmd) extractCertificateData() (*rolesAnywhereSignerData, e
 	// Collect certificate and any intermediates
 	certificate := certificateChain[0]
 	var intermediates []x509.Certificate
-	if c.IgnoreIntermediates {
-		intermediates = nil
-	} else {
-		if len(certificateChain) > 1 {
-			intermediates = certificateChain[1:]
-		}
+	if len(certificateChain) > 1 {
+		intermediates = certificateChain[1:]
 	}
 
 	//extract key type
