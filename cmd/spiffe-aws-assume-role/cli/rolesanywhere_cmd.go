@@ -40,6 +40,7 @@ type RolesAnywhereCmd struct {
 	PrivateKey              string        `required:"" group:"AWS Config" help:"Private key for X.509 Certificate"`
 	Certificate             string        `required:"" group:"AWS Config" help:"Certificate to be used with RolesAnywhere"`
 	Endpoint                string        `optional:"" group:"AWS Config" help:"Endpoint to use for the RolesAnywhere Request"`
+	STSEndpoint             string        `optional:"" group:"AWS Config" help:"Endpoint to use for the Jump STS Request"`
 	SessionDuration         time.Duration `optional:"" group:"AWS Config" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
 	Region                  string        `optional:"" group:"AWS Config" help:"Trust Anchor region to use"`
 	WithProxy               bool          `optional:""  group:"AWS Config" help:""`
@@ -339,6 +340,10 @@ func (c *RolesAnywhereCmd) createStsClient(jumpCreds *aws_signing_helper.Credent
 			jumpCreds.AccessKeyId, jumpCreds.SecretAccessKey, jumpCreds.SessionToken,
 		),
 	).WithRegion("us-west-2").WithLogLevel(logLevel)
+
+	if c.STSEndpoint != "" {
+		credsForSts = credsForSts.WithEndpoint(c.STSEndpoint)
+	}
 
 	stsSession := session.Must(session.NewSession(credsForSts))
 
