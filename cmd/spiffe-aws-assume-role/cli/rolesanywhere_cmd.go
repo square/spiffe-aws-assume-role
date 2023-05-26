@@ -17,7 +17,6 @@ import (
 	"github.com/aws/aws-sdk-go/aws"
 	"github.com/aws/aws-sdk-go/aws/arn"
 	"github.com/aws/aws-sdk-go/aws/credentials"
-
 	"github.com/aws/aws-sdk-go/aws/request"
 	"github.com/aws/aws-sdk-go/aws/session"
 	"github.com/aws/aws-sdk-go/service/sts"
@@ -41,6 +40,7 @@ type RolesAnywhereCmd struct {
 	Certificate             string        `required:"" group:"AWS Config" help:"Certificate to be used with RolesAnywhere"`
 	Endpoint                string        `optional:"" group:"AWS Config" help:"Endpoint to use for the RolesAnywhere Request"`
 	STSEndpoint             string        `optional:"" group:"AWS Config" help:"Endpoint to use for the Jump STS Request"`
+	STSRegion               string        `optional:"" group:"AWS Config" help:"Region to use for the STS Request"`
 	SessionDuration         time.Duration `optional:"" group:"AWS Config" type:"iso8601duration" help:"AWS session duration in ISO8601 duration format (e.g. PT5M for five minutes)"`
 	Region                  string        `optional:"" group:"AWS Config" help:"Trust Anchor region to use"`
 	WithProxy               bool          `optional:""  group:"AWS Config" help:""`
@@ -339,10 +339,14 @@ func (c *RolesAnywhereCmd) createStsClient(jumpCreds *aws_signing_helper.Credent
 		credentials.NewStaticCredentials(
 			jumpCreds.AccessKeyId, jumpCreds.SecretAccessKey, jumpCreds.SessionToken,
 		),
-	).WithRegion("us-west-2").WithLogLevel(logLevel)
+	).WithLogLevel(logLevel)
+
+	if c.STSRegion != "" {
+		credsForSts.WithRegion(c.STSRegion)
+	}
 
 	if c.STSEndpoint != "" {
-		credsForSts = credsForSts.WithEndpoint(c.STSEndpoint)
+		credsForSts.WithEndpoint(c.STSEndpoint)
 	}
 
 	stsSession := session.Must(session.NewSession(credsForSts))
