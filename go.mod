@@ -10,7 +10,7 @@ require (
 	github.com/aws/rolesanywhere-credential-helper v1.0.4
 	github.com/channelmeter/iso8601duration v0.0.0-20150204201828-8da3af7a2a61
 	github.com/evalphobia/logrus_sentry v0.8.2
-	github.com/google/uuid v1.3.1
+	github.com/google/uuid v1.4.0
 	github.com/pkg/errors v0.9.1
 	github.com/sirupsen/logrus v1.9.3
 	github.com/spiffe/go-spiffe/v2 v2.1.6
