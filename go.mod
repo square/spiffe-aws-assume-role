@@ -4,7 +4,7 @@ go 1.19
 
 require (
 	github.com/DataDog/datadog-go v4.8.3+incompatible
-	github.com/alecthomas/kong v0.8.1
+	github.com/alecthomas/kong v0.9.0
 	github.com/armon/go-metrics v0.4.1
 	github.com/aws/aws-sdk-go v1.51.1
 	github.com/aws/rolesanywhere-credential-helper v1.0.4
