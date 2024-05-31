@@ -22,6 +22,9 @@ jobs:
         goos: ${{ matrix.goos }}
         goarch: ${{ matrix.goarch }}
         project_path: "cmd/spiffe-aws-assume-role"
-        goversion: "https://go.dev/dl/go1.21.4.linux-amd64.tar.gz"
+        goversion: "https://go.dev/dl/go1.22.3.linux-amd64.tar.gz"
         binary_name: "spiffe-aws-assume-role"
         extra_files: LICENSE README.md
+        ldflags: "-w -s"
+      env:
+        CGO_ENABLED: 0
