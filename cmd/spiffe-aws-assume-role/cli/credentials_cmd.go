@@ -19,7 +19,7 @@ import (
 
 type CredentialsCmd struct {
 	Audience                string        `required:"" help:"SVID JWT Audience. Must match AWS configuration"`
-	SpiffeID                string        `required:"" help:"The SPIFFE ID of this workload"`
+	SpiffeID                string        `optional:"" help:"The SPIFFE ID of this workload"`
 	WorkloadSocket          string        `optional:"" help:"Path to SPIFFE Workload Socket"`
 	RoleARN                 string        `required:"" help:"AWS Role ARN to assume"`
 	SessionName             string        `optional:"" help:"AWS Session Name"`
@@ -48,9 +48,12 @@ func (c *CredentialsCmd) Run(context *CliContext) (err error) {
 	emitMetrics := t.Instrument(context.TelemetryOpts.OIDCMetricName, &err)
 	defer emitMetrics()
 
-	spiffeID, err := spiffeid.FromString(c.SpiffeID)
-	if err != nil {
-		return errors.Wrap(err, fmt.Sprintf("failed to parse SPIFFE ID from %s", c.SpiffeID))
+	spiffeID := spiffeid.ID{}
+	if c.SpiffeID != "" {
+		spiffeID, err = spiffeid.FromString(c.SpiffeID)
+		if err != nil {
+			return errors.Wrap(err, fmt.Sprintf("failed to parse SPIFFE ID from %s", c.SpiffeID))
+		}
 	}
 
 	src := context.JWTSourceProvider(spiffeID, c.WorkloadSocket, c.Audience, context.Logger, t)
