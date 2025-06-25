@@ -359,7 +359,7 @@ func (c *RolesAnywhereCmd) createStsClient(jumpCreds *aws_signing_helper.Credent
 func (c *RolesAnywhereCmd) createStsCredentials(input *stsCreateCredsInput) (*aws_signing_helper.CredentialProcessOutput, error) {
 	var sessionName string
 	// If we can use a URI to form a session name, do that
-	if input.signerData.certificate.URIs != nil && len(input.signerData.certificate.URIs) > 0 {
+	if len(input.signerData.certificate.URIs) > 0 {
 		sessionName = strings.ReplaceAll((input.signerData.certificate.URIs[0].Hostname() + input.signerData.certificate.URIs[0].EscapedPath()), "/", ".")
 	} else {
 		sessionName = input.signerData.certificate.Subject.CommonName
