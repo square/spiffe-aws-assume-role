@@ -13,9 +13,9 @@ jobs:
         uses: actions/checkout@ee0669bd1cc54295c223e0bb666b733df41de1c5  # v2 https://github.com/actions/checkout/releases/tag/v2
 
       - name: Lint code
-        uses: golangci/golangci-lint-action@3a919529898de77ec3da873e3063ca4b10e7f5cc  # v3 https://github.com/golangci/golangci-lint-action/releases/tag/v3
+        uses: golangci/golangci-lint-action@55c2c1448f86e01eaae002a5a3a9624417608d84 # v6.5.2 https://github.com/golangci/golangci-lint-action/releases/tag/v6.5.2
         with:
-          version: v1.52.2
+          version: v1.64.8
 
       - name: Download dependencies
         run: go mod download
