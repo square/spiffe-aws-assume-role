@@ -80,7 +80,7 @@ func (sp *Provider) Retrieve() (credentials.Value, error) {
 		return credentials.Value{}, errors.Wrap(err, fmt.Sprintf("failed to assume role %s", sp.RoleARN))
 	}
 
-	sp.Expiry.SetExpiration(*out.Credentials.Expiration, sp.RenewWindow)
+	sp.SetExpiration(*out.Credentials.Expiration, sp.RenewWindow)
 
 	return credentials.Value{
 		AccessKeyID:     *out.Credentials.AccessKeyId,
