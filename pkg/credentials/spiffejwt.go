@@ -65,7 +65,13 @@ func (jss *JWTSVIDSource) FetchToken(ctx context.Context) (token string, err err
 	if err != nil {
 		return "", errors.Wrap(err, "creating JWT-SVID source")
 	}
-	defer jwtSource.Close()
+	defer func() {
+		// A close failure is only logged: it must not override a successfully
+		// fetched token or mask the original fetch error.
+		if closeErr := jwtSource.Close(); closeErr != nil {
+			jss.logger.Warn(errors.Wrap(closeErr, "closing JWT-SVID source"))
+		}
+	}()
 
 	params := jwtsvid.Params{
 		Audience: jss.audience,

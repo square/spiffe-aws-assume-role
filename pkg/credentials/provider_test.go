@@ -188,7 +188,7 @@ func TestRetrieveSetsExpirationOnCredentials(t *testing.T) {
 
 	require.EqualValues(t,
 		expiration.Round(0).Add(-time.Minute),
-		provider.Expiry.ExpiresAt())
+		provider.ExpiresAt())
 }
 
 func TestAssumeRoleAppendsPolicies(t *testing.T) {
