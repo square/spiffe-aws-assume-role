@@ -1,0 +1,9 @@
+version: "2"
+
+linters:
+  exclusions:
+    rules:
+      # aws-sdk-go v1 is out of support and marks every package deprecated.
+      # Until this tool moves to aws-sdk-go-v2, don't report each import.
+      - linters: [staticcheck]
+        text: "aws-sdk-go is deprecated"
